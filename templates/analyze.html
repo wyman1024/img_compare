@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="多张图片的同步缩放、平移与滑动分析页面。">
+  <title>{{ project.title or '多图分析 ' ~ project.id[:8] }} · 像素对照台</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/analyze.css') }}">
+  <script id="analysis-project-data" type="application/json">{{ project|tojson }}</script>
+  <script src="{{ url_for('static', filename='js/analyze-view.js') }}" defer></script>
+</head>
+<body class="compare-page analyze-page">
+  <header class="compare-header shell-wide analysis-header">
+    <a class="brand brand-light" href="/" aria-label="返回像素对照台首页">
+      <span class="brand-mark" aria-hidden="true"><i></i></span>
+      <span>像素对照台</span>
+    </a>
+    <div class="compare-actions">
+      <button class="copy-button" id="copy-analysis-link" type="button" aria-live="polite">
+        <span class="copy-icon" aria-hidden="true"></span>
+        <span class="copy-label">复制此页链接</span>
+      </button>
+      <a class="new-link" href="/analyze/new">新建多图分析 <span aria-hidden="true">＋</span></a>
+    </div>
+  </header>
+
+  <main class="shell-wide analysis-main">
+    <section class="analysis-heading" aria-labelledby="analysis-title">
+      <div>
+        <p class="eyebrow">MULTI ANALYSIS / {{ project.id[:8] }}</p>
+        <h1 id="analysis-title">{{ project.title or '多图分析' }}</h1>
+      </div>
+      <p><span>{{ project.variants|length }} 个版本</span> · 所有视窗同步缩放与平移</p>
+    </section>
+
+    <section class="analysis-workspace" id="analysis-workspace" aria-label="多图分析工作区">
+      <div class="analysis-toolbar" role="toolbar" aria-label="图片分析工具">
+        <div class="analysis-mode-switch" aria-label="对比模式">
+          <button type="button" data-mode="parallel" class="is-active" aria-pressed="true">并排对比</button>
+          <button type="button" data-mode="slider" aria-pressed="false">滑杆对比</button>
+        </div>
+
+        <div class="analysis-pair-selectors" id="analysis-pair-selectors" hidden>
+          <label for="slider-left">上层</label>
+          <select id="slider-left" aria-label="选择滑杆左侧图片"></select>
+          <span aria-hidden="true">/</span>
+          <label for="slider-right">下层</label>
+          <select id="slider-right" aria-label="选择滑杆右侧图片"></select>
+        </div>
+
+        <div class="analysis-view-actions">
+          <button type="button" data-action="fit" title="适应窗口（F）">适应</button>
+          <button type="button" data-action="actual" title="按原始像素显示（1）">100%</button>
+          <button type="button" data-action="zoom-out" aria-label="缩小" title="缩小（-）">−</button>
+          <output id="analysis-zoom" aria-live="polite">适应</output>
+          <button type="button" data-action="zoom-in" aria-label="放大" title="放大（+）">＋</button>
+          <button type="button" data-action="reset" title="复位视图（R）">复位</button>
+          <button type="button" data-action="fullscreen" id="analysis-fullscreen" aria-pressed="false" title="全屏查看">
+            <span class="fullscreen-icon" aria-hidden="true"><i></i></span>
+            <span class="analysis-fullscreen-label">全屏</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="analysis-viewer" id="analysis-viewer" tabindex="-1">
+        <div class="analysis-loading" id="analysis-loading"><span></span> 正在载入多图分析…</div>
+      </div>
+      <p class="analysis-shortcuts">滚轮缩放 · 拖动画布平移 · 双指缩放 · <kbd>F</kbd> 适应窗口 · <kbd>R</kbd> 复位</p>
+    </section>
+
+    <p class="analysis-alignment-note" id="analysis-alignment-note">
+      同步的是归一化视图中心与缩放倍率；素材未做空间对齐，并始终保持原始比例。
+    </p>
+
+    <section class="analysis-variant-meta" id="analysis-variant-meta" aria-label="素材信息"></section>
+
+    <label class="share-field analysis-share-field" for="analysis-share-url">
+      <span>分享地址</span>
+      <input id="analysis-share-url" type="text" value="{{ share_url }}" readonly spellcheck="false" autocomplete="off">
+    </label>
+  </main>
+
+  <footer class="compare-footer shell-wide">
+    <span>本页面存储于局域网服务器 · 发布后只读</span>
+    <a href="/analyze/new">创建另一组多图分析 →</a>
+  </footer>
+</body>
+</html>

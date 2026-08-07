@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="多组 A/B 图片的瀑布流对比图集。">
+  <title>{{ project.title or '批量对比图集' }} · 像素对照台</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/gallery.css') }}">
+  <script src="{{ url_for('static', filename='js/gallery-view.js') }}" defer></script>
+</head>
+{% set variant_a = project.variants[0] %}
+{% set variant_b = project.variants[1] %}
+<body class="gallery-view-page">
+  <header class="compare-header shell-wide gallery-view-header">
+    <a class="brand brand-light" href="/" aria-label="返回像素对照台首页">
+      <span class="brand-mark" aria-hidden="true"><i></i></span>
+      <span>像素对照台</span>
+    </a>
+    <div class="compare-actions">
+      <button class="copy-button" id="copy-button" type="button" aria-live="polite">
+        <span class="copy-icon" aria-hidden="true"></span>
+        <span class="copy-label">复制图集链接</span>
+      </button>
+      <a class="new-link" href="/gallery/new">新建图集 <span aria-hidden="true">＋</span></a>
+    </div>
+  </header>
+
+  <main class="gallery-view-main shell-wide">
+    <section class="gallery-view-heading">
+      <div>
+        <p class="eyebrow">GALLERY / {{ project.id[:8] }}</p>
+        <h1>{{ project.title or '未命名批量对比图集' }}</h1>
+        <p>点击任意卡片，打开完整滑杆对比。</p>
+      </div>
+      <div class="gallery-view-stats" aria-label="图集信息">
+        <span><strong>{{ project.groups|length }}</strong> 组对比</span>
+        <span><i class="variant-dot variant-dot-a"></i>{{ variant_a.label }}</span>
+        <span><i class="variant-dot variant-dot-b"></i>{{ variant_b.label }}</span>
+      </div>
+    </section>
+
+    <section class="gallery-grid" id="gallery-grid" aria-label="图集中的对比组">
+      {% for group in project.groups %}
+        {% set image_a = project.images[group.images[variant_a.id]] %}
+        {% set image_b = project.images[group.images[variant_b.id]] %}
+        <article class="gallery-grid-item">
+          <button class="gallery-card" type="button"
+                  data-index="{{ loop.index0 }}"
+                  data-title="{{ group.title or ('第 ' ~ loop.index ~ ' 组') }}"
+                  data-a-url="{{ image_a.url }}"
+                  data-b-url="{{ image_b.url }}"
+                  data-a-name="{{ image_a.original_name }}"
+                  data-b-name="{{ image_b.original_name }}"
+                  data-a-size="{{ image_a.size }}"
+                  data-b-size="{{ image_b.size }}"
+                  data-a-width="{{ image_a.width }}"
+                  data-a-height="{{ image_a.height }}"
+                  data-b-width="{{ image_b.width }}"
+                  data-b-height="{{ image_b.height }}"
+                  aria-label="打开{{ group.title or ('第 ' ~ loop.index ~ ' 组') }}的滑杆对比">
+            <span class="gallery-card-media" style="--preview-ratio: {{ image_a.width }}/{{ image_a.height }};">
+              <span class="gallery-card-checker" aria-hidden="true"></span>
+              <img class="gallery-card-image gallery-card-image-b" data-src="{{ image_b.preview_url }}" alt="" decoding="async" draggable="false">
+              <span class="gallery-card-image-a-wrap" aria-hidden="true">
+                <img class="gallery-card-image gallery-card-image-a" data-src="{{ image_a.preview_url }}" alt="" decoding="async" draggable="false">
+              </span>
+              <span class="gallery-card-split" aria-hidden="true"></span>
+              <span class="gallery-card-label gallery-card-label-a">{{ variant_a.label }}</span>
+              <span class="gallery-card-label gallery-card-label-b">{{ variant_b.label }}</span>
+            </span>
+            <span class="gallery-card-copy">
+              <strong>{{ group.title or ('第 ' ~ loop.index ~ ' 组') }}</strong>
+              <small>
+                {{ image_a.width }} × {{ image_a.height }}
+                {% if image_a.width != image_b.width or image_a.height != image_b.height %}
+                  <em>尺寸不同</em>
+                {% else %}
+                  <em>尺寸一致</em>
+                {% endif %}
+              </small>
+            </span>
+            <span class="gallery-card-arrow" aria-hidden="true">↗</span>
+          </button>
+        </article>
+      {% endfor %}
+    </section>
+
+    <label class="share-field gallery-share-field" for="share-url">
+      <span>分享地址</span>
+      <input id="share-url" type="text" value="{{ share_url }}" readonly spellcheck="false" autocomplete="off">
+    </label>
+  </main>
+
+  <footer class="compare-footer shell-wide gallery-view-footer">
+    <span>共 {{ project.groups|length }} 组 · 图片存储于局域网服务器</span>
+    <a href="/gallery/new">创建另一个图集 →</a>
+  </footer>
+
+  <dialog class="gallery-view-dialog" id="gallery-dialog" aria-labelledby="dialog-title">
+    <div class="gallery-dialog-frame">
+      <header class="gallery-dialog-header">
+        <div>
+          <span id="dialog-counter">1 / {{ project.groups|length }}</span>
+          <h2 id="dialog-title">图片对比</h2>
+        </div>
+        <div class="gallery-dialog-controls">
+          <button id="dialog-previous" type="button" aria-label="上一组对比">← <span>上一组</span></button>
+          <button id="dialog-next" type="button" aria-label="下一组对比"><span>下一组</span> →</button>
+          <button id="dialog-close" type="button" aria-label="关闭对比弹层">×</button>
+        </div>
+      </header>
+
+      <div class="gallery-dialog-viewer" id="dialog-viewer">
+        <div class="gallery-dialog-stage" id="dialog-stage" style="--position: 50%;">
+          <span class="gallery-card-checker" aria-hidden="true"></span>
+          <img class="gallery-dialog-image gallery-dialog-image-b" id="dialog-image-b" alt="" draggable="false">
+          <span class="gallery-dialog-image-a-wrap" aria-hidden="true">
+            <img class="gallery-dialog-image gallery-dialog-image-a" id="dialog-image-a" alt="" draggable="false">
+          </span>
+          <span class="image-corner-label label-a" id="dialog-label-a">{{ variant_a.label }}</span>
+          <span class="image-corner-label label-b" id="dialog-label-b">{{ variant_b.label }}</span>
+          <span class="divider" aria-hidden="true"><span class="divider-line"></span><span class="divider-handle">↔</span></span>
+          <input class="comparison-range" id="dialog-range" type="range" min="0" max="100" value="50" step="0.1" aria-label="调整两张图片的分界位置">
+          <button class="fullscreen-button" id="dialog-fullscreen" type="button" aria-pressed="false" title="全屏查看图片对比">
+            <span class="fullscreen-icon" aria-hidden="true"><i></i></span>
+            <span class="fullscreen-label">全屏</span>
+          </button>
+          <div class="image-loading" id="dialog-loading" aria-live="polite"><span></span> 正在载入原图…</div>
+        </div>
+      </div>
+
+      <div class="gallery-dialog-meta">
+        <article>
+          <span class="slot-label">A</span>
+          <div><small>{{ variant_a.label }}</small><strong id="dialog-a-name"></strong></div>
+          <span id="dialog-a-meta"></span>
+        </article>
+        <article>
+          <span class="slot-label slot-label-alt">B</span>
+          <div><small>{{ variant_b.label }}</small><strong id="dialog-b-name"></strong></div>
+          <span id="dialog-b-meta"></span>
+        </article>
+      </div>
+      <p class="gallery-dialog-note" id="dialog-ratio-note" hidden>两张图片尺寸不同，已居中适配且不会拉伸。</p>
+    </div>
+  </dialog>
+</body>
+</html>

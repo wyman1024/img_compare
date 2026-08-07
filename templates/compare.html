@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="两张图片的交互式滑动对比页面。">
+  <title>图片对比 {{ comparison.id[:8] }} · 像素对照台</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <script src="{{ url_for('static', filename='js/compare.js') }}" defer></script>
+</head>
+<body class="compare-page">
+  <header class="compare-header shell-wide">
+    <a class="brand brand-light" href="/" aria-label="返回像素对照台首页">
+      <span class="brand-mark" aria-hidden="true"><i></i></span>
+      <span>像素对照台</span>
+    </a>
+    <div class="compare-actions">
+      <button class="copy-button" id="copy-button" type="button" aria-live="polite">
+        <span class="copy-icon" aria-hidden="true"></span>
+        <span class="copy-label">复制此页链接</span>
+      </button>
+      <a class="new-link" href="/">新建对比 <span aria-hidden="true">＋</span></a>
+    </div>
+  </header>
+
+  <main class="compare-main shell-wide">
+    <section class="compare-heading">
+      <div>
+        <p class="eyebrow">COMPARISON / {{ comparison.id[:8] }}</p>
+        <h1>拖动滑杆，查看每一处不同。</h1>
+      </div>
+      <p class="compare-help"><kbd>←</kbd><kbd>→</kbd> 可精细移动滑杆</p>
+    </section>
+
+    <section class="comparison-shell" aria-label="图片滑动对比">
+      <div class="comparison-stage" id="comparison-stage" style="--position: 50%;">
+        <div class="checkerboard" aria-hidden="true"></div>
+        <img class="compare-image compare-image-b" src="{{ comparison.image2.url }}" alt="图片 B：{{ comparison.image2.original_name }}" draggable="false">
+        <div class="compare-image-a-wrap" aria-hidden="true">
+          <img class="compare-image compare-image-a" src="{{ comparison.image1.url }}" alt="" draggable="false">
+        </div>
+        <span class="image-corner-label label-a">A</span>
+        <span class="image-corner-label label-b">B</span>
+        <div class="divider" aria-hidden="true">
+          <span class="divider-line"></span>
+          <span class="divider-handle">↔</span>
+        </div>
+        <input class="comparison-range" id="comparison-range" type="range" min="0" max="100" value="50" step="0.1" aria-label="调整图片 A 与图片 B 的分界位置">
+        <button class="fullscreen-button" id="fullscreen-button" type="button" aria-pressed="false" title="全屏查看图片对比">
+          <span class="fullscreen-icon" aria-hidden="true"><i></i></span>
+          <span class="fullscreen-label">全屏</span>
+        </button>
+        <div class="image-loading" id="image-loading" aria-live="polite"><span></span> 正在载入图片…</div>
+      </div>
+    </section>
+
+    <section class="comparison-meta" aria-label="图片信息">
+      <article class="image-meta-card">
+        <span class="slot-label">A</span>
+        <div>
+          <p>图片 A</p>
+          <strong title="{{ comparison.image1.original_name }}">{{ comparison.image1.original_name }}</strong>
+        </div>
+        <span class="meta-size" data-bytes="{{ comparison.image1.size }}" data-dimensions="{{ comparison.image1.width }} × {{ comparison.image1.height }}"></span>
+      </article>
+      <div class="versus" aria-hidden="true">VS</div>
+      <article class="image-meta-card">
+        <span class="slot-label slot-label-alt">B</span>
+        <div>
+          <p>图片 B</p>
+          <strong title="{{ comparison.image2.original_name }}">{{ comparison.image2.original_name }}</strong>
+        </div>
+        <span class="meta-size" data-bytes="{{ comparison.image2.size }}" data-dimensions="{{ comparison.image2.width }} × {{ comparison.image2.height }}"></span>
+      </article>
+    </section>
+    <p class="ratio-note" id="ratio-note" hidden>两张图片的尺寸或比例不同，已居中适配且不会拉伸。</p>
+    <label class="share-field" for="share-url">
+      <span>分享地址</span>
+      <input id="share-url" type="text" value="{{ share_url }}" readonly spellcheck="false" autocomplete="off">
+    </label>
+  </main>
+
+  <footer class="compare-footer shell-wide">
+    <span>本页面存储于局域网服务器</span>
+    <a href="/">创建另一组对比 →</a>
+  </footer>
+</body>
+</html>

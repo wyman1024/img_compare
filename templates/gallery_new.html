@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="逐组添加 A/B 图片，生成可在局域网分享的瀑布流对比图集。">
+  <title>新建批量对比图集 · 像素对照台</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/gallery.css') }}">
+  <script src="{{ url_for('static', filename='js/gallery-new.js') }}" defer></script>
+</head>
+<body class="gallery-create-page"
+      data-max-image-bytes="{{ max_image_bytes|default(20971520, true) }}"
+      data-max-project-bytes="{{ max_project_bytes|default(536870912, true) }}"
+      data-max-groups="{{ max_groups|default(30, true) }}">
+  <header class="site-header shell gallery-create-header">
+    <a class="brand" href="/" aria-label="返回像素对照台首页">
+      <span class="brand-mark" aria-hidden="true"><i></i></span>
+      <span>像素对照台</span>
+    </a>
+    <a class="gallery-back-link" href="/">返回首页</a>
+  </header>
+
+  <main class="gallery-create-main shell">
+    <section class="gallery-create-heading" aria-labelledby="page-title">
+      <p class="eyebrow">BATCH COMPARISON · 01—30</p>
+      <h1 id="page-title">把多组差异，整理成一个图集。</h1>
+      <p>图片只会在点击“生成图集”后上传。先逐组添加、检查顺序，再一次发布为专属链接。</p>
+    </section>
+
+    <section class="gallery-settings" aria-labelledby="settings-title">
+      <div>
+        <p class="section-kicker">01 · 图集信息</p>
+        <h2 id="settings-title">命名与标签</h2>
+      </div>
+      <div class="gallery-field-grid">
+        <label class="gallery-field gallery-field-wide" for="gallery-title">
+          <span>图集标题 <small>可选</small></span>
+          <input id="gallery-title" type="text" maxlength="80" placeholder="例如：场景渲染效果对比" autocomplete="off">
+        </label>
+        <label class="gallery-field" for="variant-a-label">
+          <span>A 标签</span>
+          <input id="variant-a-label" type="text" maxlength="24" value="原图" autocomplete="off">
+        </label>
+        <label class="gallery-field" for="variant-b-label">
+          <span>B 标签</span>
+          <input id="variant-b-label" type="text" maxlength="24" value="对比图" autocomplete="off">
+        </label>
+      </div>
+    </section>
+
+    <section class="gallery-add-section" aria-labelledby="add-title">
+      <div class="gallery-section-heading">
+        <div>
+          <p class="section-kicker">02 · 逐组添加</p>
+          <h2 id="add-title">放入这一组图片</h2>
+        </div>
+        <p>拖入一个文件会放到当前槽位；一次拖入两个文件会自动填满 A / B。</p>
+      </div>
+
+      <div class="gallery-pair-editor" id="pair-editor">
+        <label class="gallery-field gallery-group-title-field" for="pending-group-title">
+          <span>组名 <small>可选</small></span>
+          <input id="pending-group-title" type="text" maxlength="80" placeholder="例如：室内场景 / 4K" autocomplete="off">
+        </label>
+
+        <div class="gallery-drop-grid">
+          <article class="gallery-drop-zone" data-slot="A" tabindex="0" role="button" aria-label="选择这一组的 A 图片">
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" hidden>
+            <div class="gallery-drop-empty">
+              <span class="slot-label">A</span>
+              <span class="gallery-upload-symbol" aria-hidden="true">↓</span>
+              <strong>拖入 A 图片</strong>
+              <small>或点击选择文件</small>
+            </div>
+            <div class="gallery-drop-preview" hidden>
+              <img alt="待添加的 A 图片预览">
+              <span class="gallery-preview-shade"></span>
+              <div class="gallery-preview-copy">
+                <span class="slot-label">A</span>
+                <span><strong class="gallery-file-name"></strong><small class="gallery-file-meta"></small></span>
+                <button class="gallery-icon-button gallery-clear-pending" type="button" aria-label="移除 A 图片">×</button>
+              </div>
+            </div>
+          </article>
+
+          <button class="gallery-swap-pending" id="swap-pending" type="button" aria-label="交换这一组的 A 和 B 图片" disabled>⇄</button>
+
+          <article class="gallery-drop-zone" data-slot="B" tabindex="0" role="button" aria-label="选择这一组的 B 图片">
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" hidden>
+            <div class="gallery-drop-empty">
+              <span class="slot-label slot-label-alt">B</span>
+              <span class="gallery-upload-symbol gallery-upload-symbol-alt" aria-hidden="true">↓</span>
+              <strong>拖入 B 图片</strong>
+              <small>也可一次拖入两张</small>
+            </div>
+            <div class="gallery-drop-preview" hidden>
+              <img alt="待添加的 B 图片预览">
+              <span class="gallery-preview-shade"></span>
+              <div class="gallery-preview-copy">
+                <span class="slot-label slot-label-alt">B</span>
+                <span><strong class="gallery-file-name"></strong><small class="gallery-file-meta"></small></span>
+                <button class="gallery-icon-button gallery-clear-pending" type="button" aria-label="移除 B 图片">×</button>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="gallery-add-actions">
+          <p id="pending-hint">需要 A、B 两张有效图片才能加入清单。</p>
+          <button class="gallery-secondary-button" id="add-group" type="button" disabled>
+            添加这组 <span aria-hidden="true">＋</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="gallery-review-section" aria-labelledby="review-title">
+      <div class="gallery-section-heading">
+        <div>
+          <p class="section-kicker">03 · 发布前核对</p>
+          <h2 id="review-title">对比组清单 <span id="review-count">0</span></h2>
+        </div>
+        <p>拖动卡片调整顺序；触屏设备可使用上下移动按钮。</p>
+      </div>
+      <div class="gallery-empty-list" id="empty-list">
+        <span aria-hidden="true">A / B</span>
+        <strong>还没有对比组</strong>
+        <p>上方添加的每一组都会在这里等待发布。</p>
+      </div>
+      <ol class="gallery-review-list" id="review-list" aria-label="待发布的对比组"></ol>
+    </section>
+  </main>
+
+  <aside class="gallery-publish-dock" aria-label="图集发布状态">
+    <div class="shell gallery-publish-inner">
+      <div class="gallery-publish-summary">
+        <strong id="publish-summary">尚未添加对比组</strong>
+        <span id="publish-detail">最多 30 组 · 单图不超过 20 MB</span>
+        <span class="gallery-blocking-error" id="blocking-error" role="alert" aria-live="polite"></span>
+      </div>
+      <button class="primary-button" id="publish-button" type="button" disabled>
+        <span class="button-label">生成图集</span>
+        <span class="button-arrow" aria-hidden="true">→</span>
+        <span class="button-spinner" aria-hidden="true"></span>
+      </button>
+    </div>
+  </aside>
+
+  <dialog class="gallery-upload-dialog" id="upload-dialog" aria-labelledby="upload-title">
+    <div class="gallery-upload-dialog-inner">
+      <div class="gallery-upload-heading">
+        <div>
+          <p class="section-kicker">PUBLISHING</p>
+          <h2 id="upload-title">正在上传图集</h2>
+        </div>
+        <strong id="upload-percent">0%</strong>
+      </div>
+      <div class="gallery-progress-track" aria-hidden="true"><i id="upload-progress"></i></div>
+      <p class="gallery-upload-summary" id="upload-summary" aria-live="polite">正在创建安全上传清单…</p>
+      <ul class="gallery-upload-list" id="upload-list" aria-label="图片上传进度"></ul>
+      <p class="gallery-upload-error" id="upload-error" role="alert" aria-live="assertive"></p>
+      <div class="gallery-upload-actions">
+        <button class="gallery-text-button" id="cancel-upload" type="button">取消上传</button>
+        <button class="gallery-secondary-button" id="retry-failed" type="button" hidden>重试全部失败项</button>
+      </div>
+    </div>
+  </dialog>
+
+  <template id="review-item-template">
+    <li class="gallery-review-item" draggable="true">
+      <span class="gallery-drag-handle" aria-hidden="true">⠿</span>
+      <span class="gallery-order"></span>
+      <div class="gallery-review-pair">
+        <div class="gallery-review-image gallery-review-image-a"><img alt=""><span>A</span></div>
+        <div class="gallery-review-image gallery-review-image-b"><img alt=""><span>B</span></div>
+      </div>
+      <div class="gallery-review-copy">
+        <label><span>组名</span><input class="gallery-review-title" type="text" maxlength="80" autocomplete="off"></label>
+        <p class="gallery-review-files"></p>
+      </div>
+      <div class="gallery-review-actions">
+        <button type="button" data-action="replace-a">替换 A</button>
+        <button type="button" data-action="replace-b">替换 B</button>
+        <button type="button" data-action="swap">交换</button>
+        <button type="button" data-action="up" aria-label="上移这一组">↑</button>
+        <button type="button" data-action="down" aria-label="下移这一组">↓</button>
+        <button class="is-danger" type="button" data-action="delete">删除</button>
+      </div>
+      <input class="gallery-replace-input" data-slot="A" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" hidden>
+      <input class="gallery-replace-input" data-slot="B" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" hidden>
+    </li>
+  </template>
+</body>
+</html>

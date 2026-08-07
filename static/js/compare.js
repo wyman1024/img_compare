@@ -1,0 +1,139 @@
+(() => {
+  const stage = document.querySelector('#comparison-stage');
+  const fullscreenTarget = document.querySelector('.comparison-shell');
+  const fullscreenButton = document.querySelector('#fullscreen-button');
+  const fullscreenLabel = fullscreenButton.querySelector('.fullscreen-label');
+  const range = document.querySelector('#comparison-range');
+  const loading = document.querySelector('#image-loading');
+  const images = [...stage.querySelectorAll('.compare-image')];
+  const copyButton = document.querySelector('#copy-button');
+  const copyLabel = copyButton.querySelector('.copy-label');
+  const shareInput = document.querySelector('#share-url');
+  const ratioNote = document.querySelector('#ratio-note');
+
+  const setPosition = (value) => stage.style.setProperty('--position', `${value}%`);
+  range.addEventListener('input', () => setPosition(range.value));
+
+  const activeFullscreenElement = () => (
+    document.fullscreenElement || document.webkitFullscreenElement || null
+  );
+
+  const updateFullscreenButton = () => {
+    const active = activeFullscreenElement() === fullscreenTarget
+      || fullscreenTarget.classList.contains('is-faux-fullscreen');
+    fullscreenButton.classList.toggle('is-active', active);
+    fullscreenButton.setAttribute('aria-pressed', String(active));
+    fullscreenLabel.textContent = active ? '退出全屏' : '全屏';
+    fullscreenButton.title = active ? '退出全屏图片对比' : '全屏查看图片对比';
+  };
+
+  const leaveFauxFullscreen = () => {
+    fullscreenTarget.classList.remove('is-faux-fullscreen');
+    document.body.classList.remove('viewer-fullscreen');
+    updateFullscreenButton();
+  };
+
+  const enterFauxFullscreen = () => {
+    fullscreenTarget.classList.add('is-faux-fullscreen');
+    document.body.classList.add('viewer-fullscreen');
+    updateFullscreenButton();
+  };
+
+  fullscreenButton.addEventListener('click', async () => {
+    if (fullscreenTarget.classList.contains('is-faux-fullscreen')) {
+      leaveFauxFullscreen();
+      return;
+    }
+
+    const activeElement = activeFullscreenElement();
+    if (activeElement) {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen;
+      if (exit) await exit.call(document);
+      return;
+    }
+
+    const request = fullscreenTarget.requestFullscreen
+      || fullscreenTarget.webkitRequestFullscreen;
+    if (!request) {
+      enterFauxFullscreen();
+      return;
+    }
+
+    try {
+      await request.call(fullscreenTarget);
+    } catch {
+      enterFauxFullscreen();
+    }
+  });
+
+  document.addEventListener('fullscreenchange', updateFullscreenButton);
+  document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && fullscreenTarget.classList.contains('is-faux-fullscreen')) {
+      leaveFauxFullscreen();
+    }
+  });
+
+  let loaded = 0;
+  const imageReady = () => {
+    loaded += 1;
+    if (loaded === images.length) {
+      loading.classList.add('is-hidden');
+      stage.classList.add('is-ready');
+      const [imageA, imageB] = images;
+      const ratioA = imageA.naturalWidth / imageA.naturalHeight;
+      const ratioB = imageB.naturalWidth / imageB.naturalHeight;
+      if (imageA.naturalWidth !== imageB.naturalWidth
+        || imageA.naturalHeight !== imageB.naturalHeight
+        || Math.abs(ratioA - ratioB) > 0.001) {
+        ratioNote.hidden = false;
+      }
+    }
+  };
+  const imageFailed = () => {
+    loading.textContent = '图片载入失败，请刷新页面重试。';
+    loading.classList.add('has-error');
+  };
+  images.forEach((img) => {
+    if (img.complete) {
+      if (img.naturalWidth) imageReady();
+      else imageFailed();
+    } else {
+      img.addEventListener('load', imageReady, { once: true });
+      img.addEventListener('error', imageFailed, { once: true });
+    }
+  });
+
+  const fallbackCopy = () => {
+    shareInput.focus();
+    shareInput.select();
+    shareInput.setSelectionRange(0, shareInput.value.length);
+    const copied = document.execCommand('copy');
+    return copied;
+  };
+
+  copyButton.addEventListener('click', async () => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(shareInput.value);
+      else if (!fallbackCopy()) throw new Error('copy failed');
+      copyButton.classList.add('is-copied');
+      copyLabel.textContent = '链接已复制';
+      window.setTimeout(() => {
+        copyButton.classList.remove('is-copied');
+        copyLabel.textContent = '复制此页链接';
+      }, 1800);
+    } catch {
+      shareInput.focus();
+      shareInput.select();
+      copyLabel.textContent = '地址已选中，请复制';
+    }
+  });
+
+  document.querySelectorAll('.meta-size').forEach((node) => {
+    const bytes = Number(node.dataset.bytes);
+    const size = bytes < 1024 * 1024
+      ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+      : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    node.textContent = `${node.dataset.dimensions} · ${size}`;
+  });
+})();

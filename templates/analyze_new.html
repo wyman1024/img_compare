@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="上传 2 到 4 张图片，生成可分享的多图分析页面。">
+  <title>新建多图分析 · 像素对照台</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/analyze.css') }}">
+  <script src="{{ url_for('static', filename='js/analyze-new.js') }}" defer></script>
+</head>
+<body class="home-page analyze-create-page"
+      data-max-image-bytes="{{ max_image_bytes|default(20971520) }}"
+      data-max-project-bytes="{{ max_project_bytes|default(536870912) }}">
+  <header class="site-header shell-wide analyze-create-header">
+    <a class="brand" href="/" aria-label="返回像素对照台首页">
+      <span class="brand-mark" aria-hidden="true"><i></i></span>
+      <span>像素对照台</span>
+    </a>
+    <nav class="analyze-product-nav" aria-label="创建工具">
+      <a href="/">双图对比</a>
+      <a href="/gallery/new">批量图集</a>
+      <a href="/analyze/new" aria-current="page">多图分析</a>
+    </nav>
+  </header>
+
+  <main class="shell-wide analyze-create-main">
+    <section class="analyze-create-hero" aria-labelledby="page-title">
+      <div>
+        <p class="eyebrow">MULTI IMAGE / 2—4 VARIANTS</p>
+        <h1 id="page-title">把多个版本，放在同一个坐标系里。</h1>
+      </div>
+      <p>上传 2–4 张图片，生成一个只读的专属分析页面。可同步缩放、平移、并排观察，也可任选两张滑动对比。</p>
+    </section>
+
+    <form class="analyze-create-card" id="analyze-form" novalidate>
+      <div class="analyze-project-field">
+        <label for="project-title">
+          <span>分析标题</span>
+          <small>可选</small>
+        </label>
+        <input id="project-title" name="title" type="text" maxlength="80" placeholder="例如：降噪模型输出对比" autocomplete="off">
+      </div>
+
+      <div class="analyze-slot-heading">
+        <div>
+          <h2>选择图片</h2>
+          <p>可一次拖入多张；标签、顺序稍后都能调整。</p>
+        </div>
+        <span id="slot-count">0 / 4</span>
+      </div>
+
+      <div class="analyze-slot-grid" id="analyze-slot-grid" aria-label="多图上传槽位"></div>
+
+      <template id="analyze-slot-template">
+        <article class="analyze-slot" data-index="0">
+          <div class="analyze-slot-drop" tabindex="0" role="button" aria-keyshortcuts="Enter Space">
+            <input class="analyze-file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" hidden>
+            <div class="analyze-slot-empty">
+              <span class="analyze-variant-badge">A</span>
+              <span class="analyze-add-icon" aria-hidden="true">＋</span>
+              <strong>添加图片 A</strong>
+              <small>拖入或点击选择</small>
+            </div>
+            <div class="analyze-slot-preview" hidden>
+              <img alt="" draggable="false">
+              <div class="analyze-preview-shade"></div>
+              <div class="analyze-preview-copy">
+                <span class="analyze-variant-badge">A</span>
+                <div>
+                  <strong class="analyze-file-name"></strong>
+                  <small class="analyze-file-meta"></small>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="analyze-slot-edit" hidden>
+            <label>
+              <span class="sr-only">自定义标签</span>
+              <input class="analyze-label-input" type="text" maxlength="24" autocomplete="off">
+            </label>
+            <div class="analyze-order-actions">
+              <button class="analyze-icon-button move-left" type="button" title="向前移动" aria-label="向前移动">←</button>
+              <button class="analyze-icon-button move-right" type="button" title="向后移动" aria-label="向后移动">→</button>
+              <button class="analyze-icon-button replace-image" type="button" title="替换图片">替换</button>
+              <button class="analyze-icon-button remove-image" type="button" title="删除图片" aria-label="删除图片">×</button>
+            </div>
+          </div>
+        </article>
+      </template>
+
+      <p class="analyze-form-error" id="analyze-error" role="alert" aria-live="polite"></p>
+
+      <section class="analyze-upload-panel" id="analyze-upload-panel" hidden aria-live="polite">
+        <div class="analyze-progress-heading">
+          <div>
+            <strong id="upload-phase">正在准备上传…</strong>
+            <span id="upload-progress-copy">0%</span>
+          </div>
+          <div class="analyze-progress-track" aria-hidden="true"><i id="upload-progress-bar"></i></div>
+        </div>
+        <ol class="analyze-upload-list" id="analyze-upload-list"></ol>
+        <div class="analyze-upload-actions">
+          <button class="analyze-secondary-button" id="retry-upload" type="button" hidden>重试失败项</button>
+          <button class="analyze-secondary-button danger" id="cancel-upload" type="button">取消上传</button>
+        </div>
+      </section>
+
+      <div class="analyze-submit-bar">
+        <div>
+          <strong id="selection-summary">还需要至少 2 张图片</strong>
+          <span id="selection-size">支持 PNG、JPG、WebP、GIF、BMP</span>
+        </div>
+        <button class="primary-button analyze-create-button" id="create-analysis" type="submit" disabled>
+          <span class="button-label">生成多图分析</span>
+          <span class="button-arrow" aria-hidden="true">→</span>
+          <span class="button-spinner" aria-hidden="true"></span>
+        </button>
+      </div>
+    </form>
+  </main>
+
+  <footer class="site-footer shell-wide">
+    <span>像素对照台</span>
+    <span>图片只保存在这台局域网机器</span>
+  </footer>
+</body>
+</html>
