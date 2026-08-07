@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="多张图片的同步缩放、平移与滑动分析页面。">
-  <title>{{ project.title or '多图分析 ' ~ project.id[:8] }} · 像素对照台</title>
+  <meta name="description" content="多张图片的同步缩放、平移与滑杆对比页面。">
+  <title>{{ project.title or '图片对比 ' ~ project.id[:8] }} · 像素对照台</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/analyze.css') }}">
   <script id="analysis-project-data" type="application/json">{{ project|tojson }}</script>
@@ -21,21 +21,21 @@
         <span class="copy-icon" aria-hidden="true"></span>
         <span class="copy-label">复制此页链接</span>
       </button>
-      <a class="new-link" href="/analyze/new">新建多图分析 <span aria-hidden="true">＋</span></a>
+      <a class="new-link" href="/">新建图片对比 <span aria-hidden="true">＋</span></a>
     </div>
   </header>
 
   <main class="shell-wide analysis-main">
     <section class="analysis-heading" aria-labelledby="analysis-title">
       <div>
-        <p class="eyebrow">MULTI ANALYSIS / {{ project.id[:8] }}</p>
-        <h1 id="analysis-title">{{ project.title or '多图分析' }}</h1>
+        <p class="eyebrow">IMAGE COMPARE / {{ project.id[:8] }}</p>
+        <h1 id="analysis-title">{{ project.title or '图片对比' }}</h1>
       </div>
       <p><span>{{ project.variants|length }} 个版本</span> · 所有视窗同步缩放与平移</p>
     </section>
 
-    <section class="analysis-workspace" id="analysis-workspace" aria-label="多图分析工作区">
-      <div class="analysis-toolbar" role="toolbar" aria-label="图片分析工具">
+    <section class="analysis-workspace" id="analysis-workspace" aria-label="图片对比工作区">
+      <div class="analysis-toolbar" role="toolbar" aria-label="图片对比工具">
         <div class="analysis-mode-switch" aria-label="对比模式">
           <button type="button" data-mode="parallel" class="is-active" aria-pressed="true">并排对比</button>
           <button type="button" data-mode="slider" aria-pressed="false">滑杆对比</button>
@@ -56,17 +56,24 @@
           <output id="analysis-zoom" aria-live="polite">适应</output>
           <button type="button" data-action="zoom-in" aria-label="放大" title="放大（+）">＋</button>
           <button type="button" data-action="reset" title="复位视图（R）">复位</button>
-          <button type="button" data-action="fullscreen" id="analysis-fullscreen" aria-pressed="false" title="全屏查看">
+          <label class="analysis-title-size-control" for="analysis-title-size">
+            <span>标题字号</span>
+            <input id="analysis-title-size" type="range" min="10" max="32" step="1" value="16" aria-label="调整图片标题字号">
+            <output id="analysis-title-size-output" for="analysis-title-size" aria-live="polite">16px</output>
+          </label>
+          <button type="button" data-action="fullscreen" id="analysis-fullscreen" aria-pressed="false"
+                  aria-keyshortcuts="Shift+F" title="全屏查看（Shift + F）">
             <span class="fullscreen-icon" aria-hidden="true"><i></i></span>
             <span class="analysis-fullscreen-label">全屏</span>
+            <kbd class="fullscreen-shortcut" aria-hidden="true">Shift+F</kbd>
           </button>
         </div>
       </div>
 
       <div class="analysis-viewer" id="analysis-viewer" tabindex="-1">
-        <div class="analysis-loading" id="analysis-loading"><span></span> 正在载入多图分析…</div>
+        <div class="analysis-loading" id="analysis-loading"><span></span> 正在载入图片对比…</div>
       </div>
-      <p class="analysis-shortcuts">滚轮缩放 · 拖动画布平移 · 双指缩放 · <kbd>F</kbd> 适应窗口 · <kbd>R</kbd> 复位</p>
+      <p class="analysis-shortcuts">滚轮缩放 · 拖动画布平移 · 双指缩放 · <kbd>F</kbd> 适应窗口 · <kbd>R</kbd> 复位 · <kbd>Shift + F</kbd> 全屏</p>
     </section>
 
     <p class="analysis-alignment-note" id="analysis-alignment-note">
@@ -83,7 +90,7 @@
 
   <footer class="compare-footer shell-wide">
     <span>本页面存储于局域网服务器 · 发布后只读</span>
-    <a href="/analyze/new">创建另一组多图分析 →</a>
+    <a href="/">创建另一组图片对比 →</a>
   </footer>
 </body>
 </html>

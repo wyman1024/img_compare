@@ -1,6 +1,78 @@
 (() => {
   'use strict';
 
+  const MIN_IMAGES = 2;
+  const HARD_MAX_IMAGES = 8;
+
+  const clampImageLimit = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return HARD_MAX_IMAGES;
+    return Math.max(MIN_IMAGES, Math.min(HARD_MAX_IMAGES, Math.trunc(numeric)));
+  };
+
+  const normalizeSlotCount = (slotCount, selectedCount, maxImages = HARD_MAX_IMAGES) => {
+    const limit = clampImageLimit(maxImages);
+    const selected = Math.max(0, Math.min(limit, Math.trunc(Number(selectedCount)) || 0));
+    const requested = Math.trunc(Number(slotCount)) || MIN_IMAGES;
+    return Math.max(MIN_IMAGES, selected, Math.min(limit, requested));
+  };
+
+  const planSlotAssignments = (
+    occupiedSlots,
+    incomingCount,
+    targetIndex = null,
+    maxImages = HARD_MAX_IMAGES,
+  ) => {
+    const limit = clampImageLimit(maxImages);
+    const occupied = Array.from(
+      { length: Math.min(limit, Math.max(MIN_IMAGES, occupiedSlots.length)) },
+      (_, index) => Boolean(occupiedSlots[index]),
+    );
+    let remaining = Math.max(0, Math.trunc(Number(incomingCount)) || 0);
+    const targets = [];
+    const preferred = Number.isInteger(targetIndex)
+      && targetIndex >= 0
+      && targetIndex < occupied.length
+      ? targetIndex
+      : null;
+
+    if (preferred !== null && remaining) {
+      targets.push(preferred);
+      occupied[preferred] = true;
+      remaining -= 1;
+    }
+    const candidates = preferred === null
+      ? Array.from({ length: limit }, (_, index) => index)
+      : [
+          ...Array.from({ length: limit - preferred - 1 }, (_, index) => preferred + index + 1),
+          ...Array.from({ length: preferred }, (_, index) => index),
+        ];
+    for (const next of candidates) {
+      if (!remaining) break;
+      if (occupied[next]) continue;
+      while (occupied.length <= next) occupied.push(false);
+      targets.push(next);
+      occupied[next] = true;
+      remaining -= 1;
+    }
+    return { targets, slotCount: occupied.length, remaining };
+  };
+
+  const testHooks = {
+    minImages: MIN_IMAGES,
+    hardMaxImages: HARD_MAX_IMAGES,
+    clampImageLimit,
+    normalizeSlotCount,
+    planSlotAssignments,
+  };
+  globalThis.AnalyzeCreateUtils = testHooks;
+  globalThis.__analyzeCreateTestHooks = Object.assign(
+    globalThis.__analyzeCreateTestHooks || {},
+    testHooks,
+  );
+
+  if (typeof document === 'undefined') return;
+
   const form = document.querySelector('#analyze-form');
   const grid = document.querySelector('#analyze-slot-grid');
   const template = document.querySelector('#analyze-slot-template');
@@ -17,16 +89,20 @@
   const uploadProgressBar = document.querySelector('#upload-progress-bar');
   const retryButton = document.querySelector('#retry-upload');
   const cancelButton = document.querySelector('#cancel-upload');
+  const addSlotButton = document.querySelector('#add-slot');
+  const removeSlotButton = document.querySelector('#remove-slot');
 
   if (!form || !grid || !template) return;
 
   const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp']);
-  const letters = ['A', 'B', 'C', 'D'];
+  const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
   const configuredImageLimit = Number(document.body.dataset.maxImageBytes);
   const configuredProjectLimit = Number(document.body.dataset.maxProjectBytes);
+  const maxImages = clampImageLimit(document.body.dataset.maxImages);
   const maxImageBytes = configuredImageLimit > 0 ? configuredImageLimit : 20 * 1024 * 1024;
   const maxProjectBytes = configuredProjectLimit > 0 ? configuredProjectLimit : 512 * 1024 * 1024;
-  const records = [];
+  const records = Array(MIN_IMAGES).fill(null);
+  let slotCount = MIN_IMAGES;
   let busy = false;
   let draft = null;
   let jobs = [];
@@ -58,7 +134,7 @@
 
   const makeRecord = (file) => ({
     file,
-    label: '',
+    title: '',
     previewUrl: URL.createObjectURL(file),
   });
 
@@ -66,30 +142,39 @@
     if (record?.previewUrl) URL.revokeObjectURL(record.previewUrl);
   };
 
+  const selectedRecords = () => records.filter(Boolean);
+
   const updateSummary = () => {
-    const total = records.reduce((sum, record) => sum + record.file.size, 0);
-    countNode.textContent = `${records.length} / 4`;
-    sizeNode.textContent = records.length
+    const selected = selectedRecords();
+    const total = selected.reduce((sum, record) => sum + record.file.size, 0);
+    countNode.textContent = `${selected.length} 张已选 · ${slotCount} 个槽位`;
+    sizeNode.textContent = selected.length
       ? `合计 ${formatBytes(total)} · 单图上限 ${formatBytes(maxImageBytes)}`
       : '支持 PNG、JPG、WebP、GIF、BMP';
-    if (records.length < 2) summaryNode.textContent = `还需要 ${2 - records.length} 张图片`;
-    else summaryNode.textContent = `已选择 ${records.length} 张图片，可以生成`;
-    const valid = records.length >= 2 && records.length <= 4 && total <= maxProjectBytes;
+    const missing = slotCount - selected.length;
+    if (selected.length < MIN_IMAGES) summaryNode.textContent = `还需要 ${MIN_IMAGES - selected.length} 张图片`;
+    else if (missing) summaryNode.textContent = `还需要填入 ${missing} 个槽位`;
+    else summaryNode.textContent = `已选择 ${selected.length} 张图片，可以生成`;
+    const valid = selected.length === slotCount
+      && selected.length >= MIN_IMAGES
+      && selected.length <= maxImages
+      && total <= maxProjectBytes;
     createButton.disabled = busy || !valid;
+    addSlotButton.disabled = busy || slotCount >= maxImages;
+    removeSlotButton.disabled = busy || slotCount <= MIN_IMAGES || Boolean(records[slotCount - 1]);
     if (total > maxProjectBytes) showError(`全部图片合计不能超过 ${formatBytes(maxProjectBytes)}。`);
   };
 
   const moveRecord = (from, to) => {
-    if (busy || to < 0 || to >= records.length || from === to) return;
-    const [record] = records.splice(from, 1);
-    records.splice(to, 0, record);
+    if (busy || !records[from] || to < 0 || to >= records.length || from === to) return;
+    [records[from], records[to]] = [records[to], records[from]];
     renderSlots();
   };
 
   const removeRecord = (index) => {
     if (busy || !records[index]) return;
     revokeRecord(records[index]);
-    records.splice(index, 1);
+    records[index] = null;
     showError('');
     renderSlots();
   };
@@ -98,10 +183,20 @@
     if (busy) return;
     const incoming = [...fileList];
     if (!incoming.length) return;
-    const replacing = Number.isInteger(targetIndex) && targetIndex < records.length;
-    const available = 4 - records.length + (replacing ? 1 : 0);
-    if (incoming.length > available) {
-      showError(`多图分析最多使用 4 张图片，本次最多还能添加 ${available} 张。`);
+    const preferred = Number.isInteger(targetIndex)
+      && targetIndex >= 0
+      && targetIndex < records.length
+      ? targetIndex
+      : null;
+    const replacing = preferred !== null && Boolean(records[preferred]);
+    const plan = planSlotAssignments(
+      records.map(Boolean),
+      incoming.length,
+      preferred,
+      maxImages,
+    );
+    if (plan.remaining) {
+      showError(`图片对比最多使用 ${maxImages} 张图片，本次最多还能添加 ${plan.targets.length} 张。`);
       return;
     }
     const error = incoming.map(validateFile).find(Boolean);
@@ -110,7 +205,7 @@
       return;
     }
     const nextTotal = records.reduce((sum, record, index) => (
-      sum + (replacing && index === targetIndex ? 0 : record.file.size)
+      sum + (!record || (replacing && index === preferred) ? 0 : record.file.size)
     ), 0) + incoming.reduce((sum, file) => sum + file.size, 0);
     if (nextTotal > maxProjectBytes) {
       showError(`全部图片合计不能超过 ${formatBytes(maxProjectBytes)}。`);
@@ -119,14 +214,16 @@
 
     showError('');
     const additions = incoming.map(makeRecord);
-    if (replacing) {
-      const priorLabel = records[targetIndex].label;
-      revokeRecord(records[targetIndex]);
-      additions[0].label = priorLabel;
-      records.splice(targetIndex, 1, ...additions);
-    } else {
-      records.push(...additions);
+    while (records.length < plan.slotCount) records.push(null);
+    plan.targets.forEach((slotIndex, additionIndex) => {
+      const previous = records[slotIndex];
+      revokeRecord(previous);
+      records[slotIndex] = additions[additionIndex];
+    });
+    if (additions.length > plan.targets.length) {
+      additions.slice(plan.targets.length).forEach(revokeRecord);
     }
+    slotCount = records.length;
     renderSlots();
   };
 
@@ -163,12 +260,12 @@
     });
 
     if (!record) return;
-    slot.querySelector('.analyze-label-input').addEventListener('input', (event) => {
+    slot.querySelector('.analyze-image-title-input').addEventListener('input', (event) => {
       if (busy) {
-        event.target.value = record.label;
+        event.target.value = record.title;
         return;
       }
-      record.label = event.target.value;
+      record.title = event.target.value;
     });
     slot.querySelector('.move-left').addEventListener('click', () => moveRecord(index, index - 1));
     slot.querySelector('.move-right').addEventListener('click', () => moveRecord(index, index + 1));
@@ -178,7 +275,9 @@
 
   function renderSlots() {
     grid.replaceChildren();
-    for (let index = 0; index < 4; index += 1) {
+    slotCount = normalizeSlotCount(slotCount, records.length, maxImages);
+    grid.style.setProperty('--slot-columns', String(Math.min(slotCount, 4)));
+    for (let index = 0; index < slotCount; index += 1) {
       const slot = template.content.firstElementChild.cloneNode(true);
       const letter = letters[index];
       const record = records[index];
@@ -204,11 +303,10 @@
         image.alt = `图片 ${letter} 预览`;
         preview.querySelector('.analyze-file-name').textContent = record.file.name;
         preview.querySelector('.analyze-file-meta').textContent = formatBytes(record.file.size);
-        const labelInput = edit.querySelector('.analyze-label-input');
-        labelInput.value = record.label;
-        labelInput.placeholder = `标签（默认 ${letter}）`;
-        labelInput.setAttribute('aria-label', `图片 ${letter} 的自定义标签`);
-        labelInput.disabled = busy;
+        const imageTitleInput = edit.querySelector('.analyze-image-title-input');
+        imageTitleInput.value = record.title;
+        imageTitleInput.setAttribute('aria-label', `图片 ${letter} 的标题（可选）`);
+        imageTitleInput.disabled = busy;
         edit.querySelector('.move-left').disabled = busy || index === 0;
         edit.querySelector('.move-right').disabled = busy || index === records.length - 1;
         edit.querySelector('.replace-image').disabled = busy;
@@ -224,10 +322,10 @@
   }
 
   const buildManifest = () => {
-    const variants = records.map((record, index) => ({
-      id: letters[index],
-      label: record.label.trim() || letters[index],
-    }));
+    const variants = records.map((_record, index) => {
+      const id = letters[index];
+      return { id, label: id };
+    });
     const imageMap = {};
     const images = records.map((record, index) => {
       const variantId = letters[index];
@@ -236,6 +334,7 @@
       return {
         id: imageId,
         original_name: record.file.name,
+        title: record.title.trim(),
       };
     });
     return {
@@ -366,7 +465,7 @@
     let published = false;
     cancelButton.disabled = true;
     retryButton.hidden = true;
-    uploadPhase.textContent = '正在发布只读分析页面…';
+    uploadPhase.textContent = '正在发布只读图片对比页面…';
     try {
       const response = await fetch(`/api/drafts/${encodeURIComponent(draft.id)}/finalize`, {
         method: 'POST',
@@ -451,7 +550,13 @@
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (busy || records.length < 2 || records.length > 4) return;
+    const selected = selectedRecords();
+    if (
+      busy
+      || selected.length < MIN_IMAGES
+      || selected.length !== records.length
+      || selected.length > maxImages
+    ) return;
     showError('');
     const manifest = buildManifest();
     const fileSnapshot = records.map((record) => record.file);
@@ -512,6 +617,20 @@
     else finalizeDraft();
   });
   cancelButton.addEventListener('click', cancelUpload);
+  addSlotButton.addEventListener('click', () => {
+    if (busy || slotCount >= maxImages) return;
+    records.push(null);
+    slotCount = records.length;
+    showError('');
+    renderSlots();
+  });
+  removeSlotButton.addEventListener('click', () => {
+    if (busy || slotCount <= MIN_IMAGES || records[slotCount - 1]) return;
+    records.pop();
+    slotCount = records.length;
+    showError('');
+    renderSlots();
+  });
 
   document.addEventListener('dragenter', (event) => {
     if (busy || ![...event.dataTransfer.types].includes('Files')) return;

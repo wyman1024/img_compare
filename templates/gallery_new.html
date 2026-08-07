@@ -13,12 +13,15 @@
       data-max-image-bytes="{{ max_image_bytes|default(20971520, true) }}"
       data-max-project-bytes="{{ max_project_bytes|default(536870912, true) }}"
       data-max-groups="{{ max_groups|default(30, true) }}">
-  <header class="site-header shell gallery-create-header">
+  <header class="site-header shell-wide create-mode-header gallery-create-header">
     <a class="brand" href="/" aria-label="返回像素对照台首页">
       <span class="brand-mark" aria-hidden="true"><i></i></span>
       <span>像素对照台</span>
     </a>
-    <a class="gallery-back-link" href="/">返回首页</a>
+    <nav class="create-mode-tabs" aria-label="创建模式">
+      <a href="/">图片对比</a>
+      <a href="/gallery/new" aria-current="page">批量图集</a>
+    </nav>
   </header>
 
   <main class="gallery-create-main shell">
@@ -31,20 +34,12 @@
     <section class="gallery-settings" aria-labelledby="settings-title">
       <div>
         <p class="section-kicker">01 · 图集信息</p>
-        <h2 id="settings-title">命名与标签</h2>
+        <h2 id="settings-title">图集信息</h2>
       </div>
       <div class="gallery-field-grid">
         <label class="gallery-field gallery-field-wide" for="gallery-title">
           <span>图集标题 <small>可选</small></span>
           <input id="gallery-title" type="text" maxlength="80" placeholder="例如：场景渲染效果对比" autocomplete="off">
-        </label>
-        <label class="gallery-field" for="variant-a-label">
-          <span>A 标签</span>
-          <input id="variant-a-label" type="text" maxlength="24" value="原图" autocomplete="off">
-        </label>
-        <label class="gallery-field" for="variant-b-label">
-          <span>B 标签</span>
-          <input id="variant-b-label" type="text" maxlength="24" value="对比图" autocomplete="off">
         </label>
       </div>
     </section>
@@ -65,45 +60,57 @@
         </label>
 
         <div class="gallery-drop-grid">
-          <article class="gallery-drop-zone" data-slot="A" tabindex="0" role="button" aria-label="选择这一组的 A 图片">
-            <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" hidden>
-            <div class="gallery-drop-empty">
-              <span class="slot-label">A</span>
-              <span class="gallery-upload-symbol" aria-hidden="true">↓</span>
-              <strong>拖入 A 图片</strong>
-              <small>或点击选择文件</small>
-            </div>
-            <div class="gallery-drop-preview" hidden>
-              <img alt="待添加的 A 图片预览">
-              <span class="gallery-preview-shade"></span>
-              <div class="gallery-preview-copy">
+          <div class="gallery-drop-column">
+            <article class="gallery-drop-zone" data-slot="A" tabindex="0" role="button" aria-label="选择这一组的 A 图片">
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" hidden>
+              <div class="gallery-drop-empty">
                 <span class="slot-label">A</span>
-                <span><strong class="gallery-file-name"></strong><small class="gallery-file-meta"></small></span>
-                <button class="gallery-icon-button gallery-clear-pending" type="button" aria-label="移除 A 图片">×</button>
+                <span class="gallery-upload-symbol" aria-hidden="true">↓</span>
+                <strong>拖入 A 图片</strong>
+                <small>或点击选择文件</small>
               </div>
-            </div>
-          </article>
+              <div class="gallery-drop-preview" hidden>
+                <img alt="待添加的 A 图片预览">
+                <span class="gallery-preview-shade"></span>
+                <div class="gallery-preview-copy">
+                  <span class="slot-label">A</span>
+                  <span><strong class="gallery-file-name"></strong><small class="gallery-file-meta"></small></span>
+                  <button class="gallery-icon-button gallery-clear-pending" type="button" aria-label="移除 A 图片">×</button>
+                </div>
+              </div>
+            </article>
+            <label class="gallery-field gallery-image-title-field" for="pending-a-image-title">
+              <span>A 图片标题 <small>可选</small></span>
+              <input class="gallery-pending-image-title" id="pending-a-image-title" data-slot="A" type="text" maxlength="80" placeholder="默认不显示标题" autocomplete="off" disabled>
+            </label>
+          </div>
 
           <button class="gallery-swap-pending" id="swap-pending" type="button" aria-label="交换这一组的 A 和 B 图片" disabled>⇄</button>
 
-          <article class="gallery-drop-zone" data-slot="B" tabindex="0" role="button" aria-label="选择这一组的 B 图片">
-            <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" hidden>
-            <div class="gallery-drop-empty">
-              <span class="slot-label slot-label-alt">B</span>
-              <span class="gallery-upload-symbol gallery-upload-symbol-alt" aria-hidden="true">↓</span>
-              <strong>拖入 B 图片</strong>
-              <small>也可一次拖入两张</small>
-            </div>
-            <div class="gallery-drop-preview" hidden>
-              <img alt="待添加的 B 图片预览">
-              <span class="gallery-preview-shade"></span>
-              <div class="gallery-preview-copy">
+          <div class="gallery-drop-column">
+            <article class="gallery-drop-zone" data-slot="B" tabindex="0" role="button" aria-label="选择这一组的 B 图片">
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" hidden>
+              <div class="gallery-drop-empty">
                 <span class="slot-label slot-label-alt">B</span>
-                <span><strong class="gallery-file-name"></strong><small class="gallery-file-meta"></small></span>
-                <button class="gallery-icon-button gallery-clear-pending" type="button" aria-label="移除 B 图片">×</button>
+                <span class="gallery-upload-symbol gallery-upload-symbol-alt" aria-hidden="true">↓</span>
+                <strong>拖入 B 图片</strong>
+                <small>也可一次拖入两张</small>
               </div>
-            </div>
-          </article>
+              <div class="gallery-drop-preview" hidden>
+                <img alt="待添加的 B 图片预览">
+                <span class="gallery-preview-shade"></span>
+                <div class="gallery-preview-copy">
+                  <span class="slot-label slot-label-alt">B</span>
+                  <span><strong class="gallery-file-name"></strong><small class="gallery-file-meta"></small></span>
+                  <button class="gallery-icon-button gallery-clear-pending" type="button" aria-label="移除 B 图片">×</button>
+                </div>
+              </div>
+            </article>
+            <label class="gallery-field gallery-image-title-field" for="pending-b-image-title">
+              <span>B 图片标题 <small>可选</small></span>
+              <input class="gallery-pending-image-title" id="pending-b-image-title" data-slot="B" type="text" maxlength="80" placeholder="默认不显示标题" autocomplete="off" disabled>
+            </label>
+          </div>
         </div>
 
         <div class="gallery-add-actions">
@@ -176,7 +183,11 @@
         <div class="gallery-review-image gallery-review-image-b"><img alt=""><span>B</span></div>
       </div>
       <div class="gallery-review-copy">
-        <label><span>组名</span><input class="gallery-review-title" type="text" maxlength="80" autocomplete="off"></label>
+        <label class="gallery-review-group-title"><span>组名</span><input class="gallery-review-title" type="text" maxlength="80" autocomplete="off"></label>
+        <div class="gallery-review-image-titles">
+          <label><span>A 图片标题 <small>可选</small></span><input class="gallery-review-image-title" data-slot="A" type="text" maxlength="80" placeholder="默认不显示" autocomplete="off"></label>
+          <label><span>B 图片标题 <small>可选</small></span><input class="gallery-review-image-title" data-slot="B" type="text" maxlength="80" placeholder="默认不显示" autocomplete="off"></label>
+        </div>
         <p class="gallery-review-files"></p>
       </div>
       <div class="gallery-review-actions">

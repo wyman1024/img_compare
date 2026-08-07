@@ -19,7 +19,7 @@
         <span class="copy-icon" aria-hidden="true"></span>
         <span class="copy-label">复制此页链接</span>
       </button>
-      <a class="new-link" href="/">新建对比 <span aria-hidden="true">＋</span></a>
+      <a class="new-link" href="/">新建图片对比 <span aria-hidden="true">＋</span></a>
     </div>
   </header>
 
@@ -29,7 +29,7 @@
         <h1 class="sr-only">图片滑杆对比</h1>
         <p class="eyebrow">COMPARISON / {{ comparison.id[:8] }}</p>
       </div>
-      <p class="compare-help"><kbd>←</kbd><kbd>→</kbd> 可精细移动滑杆</p>
+      <p class="compare-help"><kbd>←</kbd><kbd>→</kbd> 精细移动滑杆 · <kbd>Shift + F</kbd> 全屏</p>
     </section>
 
     <section class="comparison-shell" aria-label="图片滑动对比">
@@ -41,14 +41,22 @@
         </div>
         <span class="image-corner-label label-a">A</span>
         <span class="image-corner-label label-b">B</span>
+        {% if comparison.image1.get('title') %}
+          <span class="image-title-overlay title-a" title="{{ comparison.image1.title }}">{{ comparison.image1.title }}</span>
+        {% endif %}
+        {% if comparison.image2.get('title') %}
+          <span class="image-title-overlay title-b" title="{{ comparison.image2.title }}">{{ comparison.image2.title }}</span>
+        {% endif %}
         <div class="divider" aria-hidden="true">
           <span class="divider-line"></span>
           <span class="divider-handle">↔</span>
         </div>
         <input class="comparison-range" id="comparison-range" type="range" min="0" max="100" value="50" step="0.1" aria-label="调整图片 A 与图片 B 的分界位置">
-        <button class="fullscreen-button" id="fullscreen-button" type="button" aria-pressed="false" title="全屏查看图片对比">
+        <button class="fullscreen-button" id="fullscreen-button" type="button" aria-pressed="false"
+                aria-keyshortcuts="Shift+F" title="全屏查看图片对比（Shift + F）">
           <span class="fullscreen-icon" aria-hidden="true"><i></i></span>
           <span class="fullscreen-label">全屏</span>
+          <kbd class="fullscreen-shortcut" aria-hidden="true">Shift+F</kbd>
         </button>
         <div class="image-loading" id="image-loading" aria-live="polite"><span></span> 正在载入图片…</div>
       </div>
@@ -59,7 +67,12 @@
         <span class="slot-label">A</span>
         <div>
           <p>图片 A</p>
-          <strong title="{{ comparison.image1.original_name }}">{{ comparison.image1.original_name }}</strong>
+          {% if comparison.image1.get('title') %}
+            <strong title="{{ comparison.image1.title }}">{{ comparison.image1.title }}</strong>
+            <span class="meta-filename" title="{{ comparison.image1.original_name }}">{{ comparison.image1.original_name }}</span>
+          {% else %}
+            <strong title="{{ comparison.image1.original_name }}">{{ comparison.image1.original_name }}</strong>
+          {% endif %}
         </div>
         <span class="meta-size" data-bytes="{{ comparison.image1.size }}" data-dimensions="{{ comparison.image1.width }} × {{ comparison.image1.height }}"></span>
       </article>
@@ -68,7 +81,12 @@
         <span class="slot-label slot-label-alt">B</span>
         <div>
           <p>图片 B</p>
-          <strong title="{{ comparison.image2.original_name }}">{{ comparison.image2.original_name }}</strong>
+          {% if comparison.image2.get('title') %}
+            <strong title="{{ comparison.image2.title }}">{{ comparison.image2.title }}</strong>
+            <span class="meta-filename" title="{{ comparison.image2.original_name }}">{{ comparison.image2.original_name }}</span>
+          {% else %}
+            <strong title="{{ comparison.image2.original_name }}">{{ comparison.image2.original_name }}</strong>
+          {% endif %}
         </div>
         <span class="meta-size" data-bytes="{{ comparison.image2.size }}" data-dimensions="{{ comparison.image2.width }} × {{ comparison.image2.height }}"></span>
       </article>
@@ -82,7 +100,7 @@
 
   <footer class="compare-footer shell-wide">
     <span>本页面存储于局域网服务器</span>
-    <a href="/">创建另一组对比 →</a>
+    <a href="/">创建另一组图片对比 →</a>
   </footer>
 </body>
 </html>

@@ -3,40 +3,40 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="上传 2 到 4 张图片，生成可分享的多图分析页面。">
-  <title>新建多图分析 · 像素对照台</title>
+  <meta name="description" content="上传 2 到 8 张图片，生成可分享的图片对比页面。">
+  <title>新建图片对比 · 像素对照台</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/analyze.css') }}">
   <script src="{{ url_for('static', filename='js/analyze-new.js') }}" defer></script>
 </head>
 <body class="home-page analyze-create-page"
       data-max-image-bytes="{{ max_image_bytes|default(20971520) }}"
-      data-max-project-bytes="{{ max_project_bytes|default(536870912) }}">
-  <header class="site-header shell-wide analyze-create-header">
+      data-max-project-bytes="{{ max_project_bytes|default(536870912) }}"
+      data-max-images="{{ max_images|default(8) }}">
+  <header class="site-header shell-wide create-mode-header analyze-create-header">
     <a class="brand" href="/" aria-label="返回像素对照台首页">
       <span class="brand-mark" aria-hidden="true"><i></i></span>
       <span>像素对照台</span>
     </a>
-    <nav class="analyze-product-nav" aria-label="创建工具">
-      <a href="/">双图对比</a>
+    <nav class="create-mode-tabs" aria-label="创建模式">
+      <a href="/" aria-current="page">图片对比</a>
       <a href="/gallery/new">批量图集</a>
-      <a href="/analyze/new" aria-current="page">多图分析</a>
     </nav>
   </header>
 
   <main class="shell-wide analyze-create-main">
     <section class="analyze-create-hero" aria-labelledby="page-title">
       <div>
-        <h1 class="sr-only" id="page-title">新建多图分析</h1>
-        <p class="eyebrow">MULTI IMAGE / 2—4 VARIANTS</p>
+        <h1 class="sr-only" id="page-title">新建图片对比</h1>
+        <p class="eyebrow">IMAGE COMPARE / 2–8 IMAGES</p>
       </div>
-      <p>上传 2–4 张图片，生成一个只读的专属分析页面。可同步缩放、平移、并排观察，也可任选两张滑动对比。</p>
+      <p>默认从 2 张图片开始，需要时可逐个增加槽位，最多对比 8 张。生成后可同步缩放、平移、并排观察，也可任选两张滑动对比。</p>
     </section>
 
     <form class="analyze-create-card" id="analyze-form" novalidate>
       <div class="analyze-project-field">
         <label for="project-title">
-          <span>分析标题</span>
+          <span>对比标题</span>
           <small>可选</small>
         </label>
         <input id="project-title" name="title" type="text" maxlength="80" placeholder="例如：降噪模型输出对比" autocomplete="off">
@@ -45,12 +45,18 @@
       <div class="analyze-slot-heading">
         <div>
           <h2>选择图片</h2>
-          <p>可一次拖入多张；标签、顺序稍后都能调整。</p>
+          <p>可一次拖入多张并自动增加槽位；图片标题、顺序稍后都能调整。</p>
         </div>
-        <span id="slot-count">0 / 4</span>
+        <div class="analyze-slot-heading-actions">
+          <span id="slot-count" aria-live="polite">0 张已选 · 2 个槽位</span>
+          <div class="analyze-slot-count-actions" aria-label="调整图片槽位数量">
+            <button class="analyze-secondary-button analyze-remove-slot" id="remove-slot" type="button">－ 减少槽位</button>
+            <button class="analyze-secondary-button analyze-add-slot" id="add-slot" type="button">＋ 添加槽位</button>
+          </div>
+        </div>
       </div>
 
-      <div class="analyze-slot-grid" id="analyze-slot-grid" aria-label="多图上传槽位"></div>
+      <div class="analyze-slot-grid" id="analyze-slot-grid" aria-label="图片对比上传槽位"></div>
 
       <template id="analyze-slot-template">
         <article class="analyze-slot" data-index="0">
@@ -75,10 +81,12 @@
             </div>
           </div>
           <div class="analyze-slot-edit" hidden>
-            <label>
-              <span class="sr-only">自定义标签</span>
-              <input class="analyze-label-input" type="text" maxlength="24" autocomplete="off">
-            </label>
+            <div class="analyze-slot-fields">
+              <label>
+                <span class="sr-only">图片标题（可选）</span>
+                <input class="analyze-image-title-input" type="text" maxlength="80" placeholder="图片标题（可选）" autocomplete="off">
+              </label>
+            </div>
             <div class="analyze-order-actions">
               <button class="analyze-icon-button move-left" type="button" title="向前移动" aria-label="向前移动">←</button>
               <button class="analyze-icon-button move-right" type="button" title="向后移动" aria-label="向后移动">→</button>
@@ -107,12 +115,12 @@
       </section>
 
       <div class="analyze-submit-bar">
-        <div>
+        <div class="analyze-submit-copy">
           <strong id="selection-summary">还需要至少 2 张图片</strong>
           <span id="selection-size">支持 PNG、JPG、WebP、GIF、BMP</span>
         </div>
         <button class="primary-button analyze-create-button" id="create-analysis" type="submit" disabled>
-          <span class="button-label">生成多图分析</span>
+          <span class="button-label">生成图片对比</span>
           <span class="button-arrow" aria-hidden="true">→</span>
           <span class="button-spinner" aria-hidden="true"></span>
         </button>

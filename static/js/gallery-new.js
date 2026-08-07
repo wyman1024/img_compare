@@ -39,13 +39,12 @@
   if (!pairEditor) return;
 
   const titleInput = document.querySelector('#gallery-title');
-  const labelAInput = document.querySelector('#variant-a-label');
-  const labelBInput = document.querySelector('#variant-b-label');
   const pendingTitleInput = document.querySelector('#pending-group-title');
   const pendingHint = document.querySelector('#pending-hint');
   const addGroupButton = document.querySelector('#add-group');
   const swapPendingButton = document.querySelector('#swap-pending');
   const zones = [...document.querySelectorAll('.gallery-drop-zone')];
+  const pendingImageTitleInputs = [...document.querySelectorAll('.gallery-pending-image-title')];
   const reviewList = document.querySelector('#review-list');
   const reviewTemplate = document.querySelector('#review-item-template');
   const emptyList = document.querySelector('#empty-list');
@@ -133,6 +132,7 @@
       objectUrl,
       width: probe.naturalWidth,
       height: probe.naturalHeight,
+      title: '',
     });
     probe.onerror = () => {
       URL.revokeObjectURL(objectUrl);
@@ -150,6 +150,7 @@
     const zone = document.querySelector(`.gallery-drop-zone[data-slot="${slot}"]`);
     const empty = zone.querySelector('.gallery-drop-empty');
     const preview = zone.querySelector('.gallery-drop-preview');
+    const imageTitleInput = document.querySelector(`.gallery-pending-image-title[data-slot="${slot}"]`);
     const entry = state.pending[slot];
 
     if (!entry) {
@@ -157,6 +158,8 @@
       preview.hidden = true;
       zone.classList.remove('has-file');
       preview.querySelector('img').removeAttribute('src');
+      imageTitleInput.value = '';
+      imageTitleInput.disabled = true;
       return;
     }
 
@@ -166,6 +169,8 @@
     empty.hidden = true;
     preview.hidden = false;
     zone.classList.add('has-file');
+    imageTitleInput.value = entry.title;
+    imageTitleInput.disabled = state.locked;
   };
 
   const getBlockingError = () => {
@@ -219,6 +224,8 @@
     document.querySelectorAll('.gallery-create-main input, .gallery-create-main button').forEach((control) => {
       control.disabled = locked;
     });
+    renderPendingSlot('A');
+    renderPendingSlot('B');
     renderReview();
     updatePageState();
   };
@@ -314,6 +321,14 @@
     });
   });
 
+  pendingImageTitleInputs.forEach((input) => {
+    input.addEventListener('input', () => {
+      if (state.locked) return;
+      const entry = state.pending[input.dataset.slot];
+      if (entry) entry.title = input.value;
+    });
+  });
+
   pairEditor.addEventListener('dragover', (event) => {
     if (![...(event.dataTransfer?.types || [])].includes('Files')) return;
     event.preventDefault();
@@ -370,6 +385,11 @@
       groupTitle.value = group.title;
       groupTitle.placeholder = `第 ${index + 1} 组`;
       groupTitle.disabled = state.locked;
+      item.querySelectorAll('.gallery-review-image-title').forEach((input) => {
+        const image = group.images[input.dataset.slot];
+        input.value = image.title;
+        input.disabled = state.locked;
+      });
       item.querySelector('.gallery-review-files').textContent = reviewFileSummary(group);
       item.querySelector('[data-action="up"]').disabled = state.locked || index === 0;
       item.querySelector('[data-action="down"]').disabled = state.locked || index === state.groups.length - 1;
@@ -413,10 +433,12 @@
   };
 
   reviewList.addEventListener('input', (event) => {
-    const input = event.target.closest('.gallery-review-title');
+    const input = event.target.closest('.gallery-review-title, .gallery-review-image-title');
     if (!input || state.locked) return;
     const group = state.groups.find((candidate) => candidate.id === input.closest('li').dataset.groupId);
-    if (group) group.title = input.value;
+    if (!group) return;
+    if (input.classList.contains('gallery-review-title')) group.title = input.value;
+    else group.images[input.dataset.slot].title = input.value;
   });
 
   reviewList.addEventListener('click', (event) => {
@@ -505,8 +527,8 @@
     kind: 'gallery',
     title: titleInput.value.trim(),
     variants: [
-      { id: 'A', label: labelAInput.value.trim() || 'A' },
-      { id: 'B', label: labelBInput.value.trim() || 'B' },
+      { id: 'A', label: 'A' },
+      { id: 'B', label: 'B' },
     ],
     groups: state.groups.map((group) => ({
       id: group.id,
@@ -516,6 +538,7 @@
     images: state.groups.flatMap((group) => ['A', 'B'].map((slot) => ({
       id: group.images[slot].id,
       original_name: group.images[slot].file.name,
+      title: group.images[slot].title.trim(),
     }))),
   });
 

@@ -1,4 +1,13 @@
 (() => {
+  const isFullscreenShortcut = (event) => (
+    String(event?.key || '').toLowerCase() === 'f'
+    && Boolean(event?.shiftKey)
+    && !event?.ctrlKey
+    && !event?.altKey
+    && !event?.metaKey
+    && !event?.repeat
+  );
+
   const stage = document.querySelector('#comparison-stage');
   const fullscreenTarget = document.querySelector('.comparison-shell');
   const fullscreenButton = document.querySelector('#fullscreen-button');
@@ -24,7 +33,9 @@
     fullscreenButton.classList.toggle('is-active', active);
     fullscreenButton.setAttribute('aria-pressed', String(active));
     fullscreenLabel.textContent = active ? '退出全屏' : '全屏';
-    fullscreenButton.title = active ? '退出全屏图片对比' : '全屏查看图片对比';
+    fullscreenButton.title = active
+      ? '退出全屏图片对比（Shift + F）'
+      : '全屏查看图片对比（Shift + F）';
   };
 
   const leaveFauxFullscreen = () => {
@@ -39,7 +50,7 @@
     updateFullscreenButton();
   };
 
-  fullscreenButton.addEventListener('click', async () => {
+  async function toggleFullscreen() {
     if (fullscreenTarget.classList.contains('is-faux-fullscreen')) {
       leaveFauxFullscreen();
       return;
@@ -64,13 +75,20 @@
     } catch {
       enterFauxFullscreen();
     }
-  });
+  }
+  fullscreenButton.addEventListener('click', toggleFullscreen);
 
   document.addEventListener('fullscreenchange', updateFullscreenButton);
   document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && fullscreenTarget.classList.contains('is-faux-fullscreen')) {
       leaveFauxFullscreen();
+    } else if (
+      isFullscreenShortcut(event)
+      && !event.target.closest?.('textarea, select, input:not([type]), input[type="text"], input[type="search"], input[type="url"], input[type="email"], input[type="password"], [contenteditable="true"]')
+    ) {
+      event.preventDefault();
+      void toggleFullscreen();
     }
   });
 

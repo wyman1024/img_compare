@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, BinaryIO
 from urllib.parse import urlsplit
 
-from flask import Flask, abort, jsonify, render_template, request, send_file
+from flask import Flask, abort, jsonify, redirect, render_template, request, send_file
 from PIL import Image, UnidentifiedImageError
 
 
@@ -28,6 +28,7 @@ DEFAULT_MAX_PROJECT_BYTES = 512 * 1024 * 1024
 DEFAULT_DRAFT_TTL_SECONDS = 24 * 60 * 60
 DEFAULT_PREVIEW_MAX_EDGE = 960
 DEFAULT_PREVIEW_QUALITY = 82
+MAX_MULTI_IMAGES = 8
 PUBLISHED_METADATA_NAME = "published-metadata.json"
 
 
@@ -258,10 +259,28 @@ class ProjectStore:
             variants.append({"id": variant_id, "label": label.strip()})
 
         variant_ids = [item["id"] for item in variants]
-        expected_ids = ["A", "B"] if kind in {"pair", "gallery"} else ["A", "B", "C", "D"][: len(variants)]
-        valid_count = len(variants) == 2 if kind in {"pair", "gallery"} else 2 <= len(variants) <= 4
+        expected_ids = (
+            ["A", "B"]
+            if kind in {"pair", "gallery"}
+            else [
+                chr(ord("A") + index)
+                for index in range(min(len(variants), MAX_MULTI_IMAGES))
+            ]
+        )
+        valid_count = (
+            len(variants) == 2
+            if kind in {"pair", "gallery"}
+            else 2 <= len(variants) <= MAX_MULTI_IMAGES
+        )
         if not valid_count or variant_ids != expected_ids:
-            message = "pair 和 gallery 必须按顺序提供 A、B 两个版本。" if kind in {"pair", "gallery"} else "multi 必须按顺序提供 A–D 中的 2–4 个版本。"
+            message = (
+                "pair 和 gallery 必须按顺序提供 A、B 两个版本。"
+                if kind in {"pair", "gallery"}
+                else (
+                    "multi 必须按顺序提供 "
+                    f"A–H 中的 2–{MAX_MULTI_IMAGES} 个版本。"
+                )
+            )
             raise ProjectStoreError(
                 message, code="invalid_manifest", field="variants"
             )
@@ -370,9 +389,24 @@ class ProjectStore:
                     code="invalid_manifest",
                     field=f"{field}.original_name",
                 )
+            image_title = raw.get("title", "")
+            if not isinstance(image_title, str):
+                raise ProjectStoreError(
+                    "图片标题必须是文本。",
+                    code="invalid_manifest",
+                    field=f"{field}.title",
+                )
+            image_title = image_title.strip()
+            if len(image_title) > 80:
+                raise ProjectStoreError(
+                    "图片标题不能超过 80 个字符。",
+                    code="invalid_manifest",
+                    field=f"{field}.title",
+                )
             images[image_id] = {
                 "id": image_id,
                 "original_name": _safe_display_name(original_name, image_id),
+                "title": image_title,
                 "status": "pending",
             }
 
@@ -626,6 +660,7 @@ class ProjectStore:
                 updated = {
                     "id": image_id,
                     "original_name": uploaded_name,
+                    "title": previous_image["title"],
                     "status": "uploaded",
                     "stored_name": new_original.relative_to(draft_dir).as_posix(),
                     "preview_name": new_preview.relative_to(draft_dir).as_posix(),
@@ -797,6 +832,7 @@ class ProjectStore:
                 for key in (
                     "id",
                     "original_name",
+                    "title",
                     "format",
                     "mime_type",
                     "size",
@@ -828,6 +864,7 @@ class ProjectStore:
                 for key in (
                     "id",
                     "original_name",
+                    "title",
                     "status",
                     "format",
                     "mime_type",
@@ -903,12 +940,7 @@ def register_project_routes(app: Flask, store: ProjectStore) -> None:
 
     @app.get("/analyze/new")
     def analyze_new():
-        return render_template(
-            "analyze_new.html",
-            max_image_bytes=store.max_image_bytes,
-            max_project_bytes=store.max_project_bytes,
-            max_images=4,
-        )
+        return redirect("/")
 
     @app.get("/gallery/<project_id>")
     def gallery_view(project_id: str):
@@ -987,6 +1019,7 @@ def register_project_routes(app: Flask, store: ProjectStore) -> None:
                 "id",
                 "status",
                 "original_name",
+                "title",
                 "format",
                 "mime_type",
                 "size",

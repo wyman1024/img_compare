@@ -97,6 +97,7 @@ def test_create_draft_returns_upload_map_and_hashes_edit_token(app):
     metadata = json.loads((draft_dir / "metadata.json").read_text("utf-8"))
     assert metadata["schema_version"] == 2
     assert metadata["kind"] == "pair"
+    assert metadata["images"]["image_0_a"]["title"] == ""
     assert metadata["edit_token_hash"] != created["edit_token"]
     assert created["edit_token"] not in (draft_dir / "metadata.json").read_text("utf-8")
     assert (draft_dir / "images").is_dir()
@@ -106,6 +107,47 @@ def test_create_draft_returns_upload_map_and_hashes_edit_token(app):
     public_text = public_state.get_data(as_text=True)
     assert created["edit_token"] not in public_text
     assert "edit_token_hash" not in public_text
+    assert public_state.get_json()["draft"]["images"]["image_0_a"]["title"] == ""
+
+
+@pytest.mark.parametrize("title", [123, "x" * 81])
+def test_manifest_rejects_invalid_image_title(client, title):
+    body = manifest()
+    body["images"][0]["title"] = title
+
+    response = client.post("/api/drafts", json=body)
+
+    assert_error(response, 400, "invalid_manifest", "images.0.title")
+
+
+def test_image_title_is_trimmed_and_survives_upload_retry_and_publication(app):
+    client = app.test_client()
+    body = manifest()
+    body["images"][0]["title"] = "  精修结果  "
+    draft = create_draft(client, body)
+
+    draft_state = client.get(f"/api/drafts/{draft['draft_id']}").get_json()["draft"]
+    assert draft_state["images"]["image_0_a"]["title"] == "精修结果"
+
+    first = upload(client, draft, "image_0_a")
+    assert first.status_code == 200
+    assert first.get_json()["image"]["title"] == "精修结果"
+    retried = upload(client, draft, "image_0_a", raw=GIF_1X1, filename="replacement.gif")
+    assert retried.status_code == 200
+    assert retried.get_json()["image"]["title"] == "精修结果"
+
+    assert upload(client, draft, "image_0_b").status_code == 200
+    finalized = client.post(
+        f"/api/drafts/{draft['draft_id']}/finalize",
+        headers={"X-Edit-Token": draft["edit_token"]},
+    )
+    assert finalized.status_code == 201
+    public_image = finalized.get_json()["project"]["images"]["image_0_a"]
+    assert public_image["title"] == "精修结果"
+
+    project_dir = Path(app.config["PROJECTS_DIR"]) / draft["draft_id"]
+    metadata = json.loads((project_dir / "metadata.json").read_text("utf-8"))
+    assert metadata["images"]["image_0_a"]["title"] == "精修结果"
 
 
 @pytest.mark.parametrize(
@@ -153,13 +195,29 @@ def test_kind_cardinality_limits(client):
         "invalid_manifest",
         "groups",
     )
-    assert client.post("/api/drafts", json=manifest("multi", variants=4)).status_code == 201
+    assert client.post("/api/drafts", json=manifest("multi", variants=8)).status_code == 201
     assert_error(
-        client.post("/api/drafts", json=manifest("multi", variants=5)),
+        client.post("/api/drafts", json=manifest("multi", variants=9)),
         400,
         "invalid_manifest",
         "variants",
     )
+
+    non_contiguous = manifest("multi", variants=3)
+    non_contiguous["variants"][2]["id"] = "D"
+    assert_error(
+        client.post("/api/drafts", json=non_contiguous),
+        400,
+        "invalid_manifest",
+        "variants",
+    )
+
+
+def test_legacy_analyze_new_redirects_to_unified_creator(client):
+    response = client.get("/analyze/new")
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/"
 
 
 def test_upload_requires_token_and_known_slot(client):
@@ -191,6 +249,7 @@ def test_valid_upload_generates_webp_and_retry_atomically_replaces_file(app):
         "id": "image_0_a",
         "status": "uploaded",
         "original_name": "first.png",
+        "title": "",
         "format": "PNG",
         "mime_type": "image/png",
         "size": len(PNG_1X1),
@@ -668,6 +727,7 @@ def test_invalid_storage_config_fails_at_startup(app_module, tmp_path, key, valu
         ("multi", 1, 2, "analyze"),
         ("multi", 1, 3, "analyze"),
         ("multi", 1, 4, "analyze"),
+        ("multi", 1, 8, "analyze"),
     ],
 )
 def test_gallery_and_multi_projects_have_kind_specific_urls(

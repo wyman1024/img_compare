@@ -14,6 +14,7 @@ from project_store import (
     DEFAULT_MAX_PROJECT_BYTES,
     DEFAULT_PREVIEW_MAX_EDGE,
     DEFAULT_PREVIEW_QUALITY,
+    MAX_MULTI_IMAGES,
     ProjectStore,
     register_project_routes,
 )
@@ -147,16 +148,11 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
 
     @app.get("/")
     def index():
-        max_image_bytes = int(app.config["MAX_IMAGE_BYTES"])
-        if max_image_bytes >= 1024 * 1024:
-            megabytes = max_image_bytes / (1024 * 1024)
-            max_image_label = f"{megabytes:g} MB"
-        else:
-            max_image_label = f"{max(1, max_image_bytes // 1024)} KB"
         return render_template(
-            "index.html",
-            max_image_bytes=max_image_bytes,
-            max_image_label=max_image_label,
+            "analyze_new.html",
+            max_image_bytes=int(app.config["MAX_IMAGE_BYTES"]),
+            max_project_bytes=int(app.config["MAX_PROJECT_BYTES"]),
+            max_images=MAX_MULTI_IMAGES,
         )
 
     @app.get("/compare/<comparison_id>")

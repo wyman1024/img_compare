@@ -1,7 +1,52 @@
 (() => {
   'use strict';
 
+  const DISPLAY_VARIANT_IDS = Object.freeze(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
+  const MIN_TITLE_SIZE = 10;
+  const MAX_TITLE_SIZE = 32;
+  const DEFAULT_TITLE_SIZE = 16;
+
   const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
+
+  const isFullscreenShortcut = (event) => (
+    String(event?.key || '').toLowerCase() === 'f'
+    && Boolean(event?.shiftKey)
+    && !event?.ctrlKey
+    && !event?.altKey
+    && !event?.metaKey
+    && !event?.repeat
+  );
+
+  const isFitShortcut = (event) => (
+    String(event?.key || '').toLowerCase() === 'f'
+    && !event?.shiftKey
+    && !event?.ctrlKey
+    && !event?.altKey
+    && !event?.metaKey
+  );
+
+  const displayVariantId = (index) => DISPLAY_VARIANT_IDS[index] || '';
+
+  const normalizeImageTitle = (value) => typeof value === 'string' ? value.trim() : '';
+
+  const clampTitleSize = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return DEFAULT_TITLE_SIZE;
+    return clamp(Math.round(numeric), MIN_TITLE_SIZE, MAX_TITLE_SIZE);
+  };
+
+  const calculateSliderTitlePositions = (split) => {
+    const numeric = Number(split);
+    const normalized = clamp(Number.isFinite(numeric) ? numeric : 50, 0, 100);
+    return {
+      left: normalized / 2,
+      right: normalized + (100 - normalized) / 2,
+      leftWidth: normalized,
+      rightWidth: 100 - normalized,
+      showLeft: normalized > 0,
+      showRight: normalized < 100,
+    };
+  };
 
   const calculateFitScale = (viewportWidth, viewportHeight, imageWidth, imageHeight) => {
     if (![viewportWidth, viewportHeight, imageWidth, imageHeight].every((value) => value > 0)) return 1;
@@ -126,6 +171,15 @@
     };
   };
 
+  const calculateComparisonColumns = (count) => {
+    const normalized = Math.max(1, Math.min(8, Math.trunc(Number(count)) || 1));
+    if (normalized <= 4) return normalized;
+    if (normalized <= 6) return 3;
+    return 4;
+  };
+
+  const defaultComparisonMode = (count) => Number(count) === 2 ? 'slider' : 'parallel';
+
   window.__analyzeTestHooks = Object.freeze({
     calculateFitScale,
     calculateBaseScale,
@@ -133,6 +187,14 @@
     screenToNormalized,
     centerForZoomAtPoint,
     panCenter,
+    calculateComparisonColumns,
+    defaultComparisonMode,
+    displayVariantId,
+    normalizeImageTitle,
+    clampTitleSize,
+    calculateSliderTitlePositions,
+    isFullscreenShortcut,
+    isFitShortcut,
   });
 
   const projectNode = document.querySelector('#analysis-project-data');
@@ -151,12 +213,13 @@
   const imagesById = project.images || {};
   const group = Array.isArray(project.groups) ? project.groups[0] : null;
   const groupImages = group?.images || {};
-  const records = (project.variants || []).map((variant) => {
+  const records = (project.variants || []).map((variant, index) => {
     const imageId = groupImages[variant.id];
     const image = imagesById[imageId];
     if (!image) return null;
     return {
       variant,
+      displayId: displayVariantId(index),
       imageId,
       image,
       url: image.url || `/media/${encodeURIComponent(project.id)}/${encodeURIComponent(imageId)}`,
@@ -164,12 +227,12 @@
   }).filter(Boolean);
 
   if (records.length < 2) {
-    viewer.textContent = '这个多图项目缺少可显示的图片。';
+    viewer.textContent = '这个图片对比项目缺少可显示的图片。';
     return;
   }
 
   const state = {
-    mode: 'parallel',
+    mode: defaultComparisonMode(records.length),
     centerX: 0.5,
     centerY: 0.5,
     zoom: 1,
@@ -178,6 +241,7 @@
     leftId: records[0].variant.id,
     rightId: records[1].variant.id,
     lastVariantId: records[0].variant.id,
+    titleSize: DEFAULT_TITLE_SIZE,
   };
   const zoomOutput = document.querySelector('#analysis-zoom');
   const pairSelectors = document.querySelector('#analysis-pair-selectors');
@@ -191,6 +255,8 @@
   const copyLabel = copyButton.querySelector('.copy-label');
   const shareInput = document.querySelector('#analysis-share-url');
   const metaContainer = document.querySelector('#analysis-variant-meta');
+  const titleSizeInput = document.querySelector('#analysis-title-size');
+  const titleSizeOutput = document.querySelector('#analysis-title-size-output');
   let resizeObserver = null;
 
   const recordForVariant = (variantId) => records.find((record) => record.variant.id === variantId) || records[0];
@@ -207,10 +273,36 @@
     zoomOutput.textContent = `${Math.round(state.zoom * 100)}%`;
   };
 
+  const hasImageTitles = records.some((record) => Boolean(normalizeImageTitle(record.image.title)));
+  const applyTitleSize = (value) => {
+    state.titleSize = clampTitleSize(value);
+    workspace.style.setProperty('--analysis-title-size', `${state.titleSize}px`);
+    if (titleSizeInput) titleSizeInput.value = String(state.titleSize);
+    if (titleSizeOutput) titleSizeOutput.textContent = `${state.titleSize}px`;
+  };
+
+  if (titleSizeInput) {
+    titleSizeInput.min = String(MIN_TITLE_SIZE);
+    titleSizeInput.max = String(MAX_TITLE_SIZE);
+    titleSizeInput.step = '1';
+    titleSizeInput.disabled = !hasImageTitles;
+    titleSizeInput.addEventListener('input', () => applyTitleSize(titleSizeInput.value));
+  }
+  applyTitleSize(DEFAULT_TITLE_SIZE);
+
   const applySplit = () => {
     viewer.style.setProperty('--analysis-split', `${state.split}%`);
     const divider = viewer.querySelector('.analysis-divider');
     if (divider) divider.setAttribute('aria-valuenow', state.split.toFixed(1));
+    const positions = calculateSliderTitlePositions(state.split);
+    viewer.style.setProperty('--analysis-left-title-center', `${positions.left}%`);
+    viewer.style.setProperty('--analysis-right-title-center', `${positions.right}%`);
+    viewer.style.setProperty('--analysis-left-title-width', `${positions.leftWidth}%`);
+    viewer.style.setProperty('--analysis-right-title-width', `${positions.rightWidth}%`);
+    viewer.querySelectorAll('.analysis-image-title-overlay[data-slider-side]').forEach((overlay) => {
+      const isLeft = overlay.dataset.sliderSide === 'left';
+      overlay.hidden = isLeft ? !positions.showLeft : !positions.showRight;
+    });
   };
 
   const renderTransforms = () => {
@@ -325,11 +417,24 @@
     label.className = `analysis-viewport-label ${corner}`.trim();
     const badge = document.createElement('span');
     badge.className = 'analyze-variant-badge';
-    badge.textContent = record.variant.id;
-    const copy = document.createElement('strong');
-    copy.textContent = record.variant.label || record.variant.id;
-    label.append(badge, copy);
+    badge.textContent = record.displayId;
+    badge.dataset.variantId = record.displayId;
+    label.append(badge);
     return label;
+  };
+
+  const makeImageTitleOverlay = (record, sliderSide = '') => {
+    const title = normalizeImageTitle(record.image.title);
+    if (!title) return null;
+    const overlay = document.createElement('div');
+    overlay.className = 'analysis-image-title-overlay';
+    overlay.textContent = title;
+    overlay.title = title;
+    if (sliderSide) {
+      overlay.classList.add(`is-${sliderSide}`);
+      overlay.dataset.sliderSide = sliderSide;
+    }
+    return overlay;
   };
 
   const makeCheckerboard = () => {
@@ -482,17 +587,24 @@
     const grid = document.createElement('div');
     grid.className = 'analysis-parallel-grid';
     grid.classList.add(`count-${records.length}`);
+    grid.classList.toggle('has-many-variants', records.length > 4);
     grid.style.setProperty('--variant-count', records.length);
+    const columnCount = calculateComparisonColumns(records.length);
+    grid.style.setProperty('--parallel-columns', columnCount);
+    grid.style.setProperty('--parallel-rows', Math.ceil(records.length / columnCount));
     const images = [];
     records.forEach((record) => {
       const viewport = document.createElement('div');
       viewport.className = 'analysis-viewport';
       viewport.tabIndex = 0;
       viewport.dataset.primaryVariant = record.variant.id;
-      viewport.setAttribute('aria-label', `${record.variant.label || record.variant.id} 视窗；拖动平移，滚轮缩放`);
-      const image = makeImage(record, `${record.variant.label || record.variant.id}：${record.image.original_name}`);
+      viewport.setAttribute('aria-label', `图片 ${record.displayId} 视窗；拖动平移，滚轮缩放`);
+      const image = makeImage(record, `图片 ${record.displayId}：${record.image.original_name}`);
       images.push(image);
-      viewport.append(makeCheckerboard(), image, makeViewportLabel(record));
+      const children = [makeCheckerboard(), image, makeViewportLabel(record)];
+      const titleOverlay = makeImageTitleOverlay(record);
+      if (titleOverlay) children.push(titleOverlay);
+      viewport.append(...children);
       wireViewportGestures(viewport, record);
       grid.append(viewport);
     });
@@ -508,27 +620,32 @@
     viewport.tabIndex = 0;
     viewport.dataset.primaryVariant = leftRecord.variant.id;
     viewport.setAttribute('aria-label', '滑杆对比视窗；拖动画布平移，滚轮缩放');
-    const rightImage = makeImage(rightRecord, `${rightRecord.variant.label || rightRecord.variant.id}：${rightRecord.image.original_name}`);
+    const rightImage = makeImage(rightRecord, `图片 ${rightRecord.displayId}：${rightRecord.image.original_name}`);
     const layer = document.createElement('div');
     layer.className = 'analysis-slider-layer';
-    const leftImage = makeImage(leftRecord, `${leftRecord.variant.label || leftRecord.variant.id}：${leftRecord.image.original_name}`);
+    const leftImage = makeImage(leftRecord, `图片 ${leftRecord.displayId}：${leftRecord.image.original_name}`);
     layer.append(leftImage);
     const divider = document.createElement('div');
     divider.className = 'analysis-divider';
     divider.tabIndex = 0;
     divider.setAttribute('role', 'slider');
-    divider.setAttribute('aria-label', `调整 ${leftRecord.variant.label || leftRecord.variant.id} 与 ${rightRecord.variant.label || rightRecord.variant.id} 的分界位置`);
+    divider.setAttribute('aria-label', `调整图片 ${leftRecord.displayId} 与图片 ${rightRecord.displayId} 的分界位置`);
     divider.setAttribute('aria-valuemin', '0');
     divider.setAttribute('aria-valuemax', '100');
     divider.innerHTML = '<i aria-hidden="true"></i><span aria-hidden="true">↔</span>';
-    viewport.append(
+    const children = [
       makeCheckerboard(),
       rightImage,
       layer,
       makeViewportLabel(leftRecord, 'is-left'),
       makeViewportLabel(rightRecord, 'is-right'),
-      divider,
-    );
+    ];
+    const leftTitleOverlay = makeImageTitleOverlay(leftRecord, 'left');
+    const rightTitleOverlay = makeImageTitleOverlay(rightRecord, 'right');
+    if (leftTitleOverlay) children.push(leftTitleOverlay);
+    if (rightTitleOverlay) children.push(rightTitleOverlay);
+    children.push(divider);
+    viewport.append(...children);
     viewer.append(viewport);
     wireViewportGestures(viewport, leftRecord);
     wireDivider(divider, viewport);
@@ -539,6 +656,7 @@
     resizeObserver?.disconnect();
     viewer.replaceChildren();
     viewer.classList.toggle('is-slider-mode', state.mode === 'slider');
+    viewer.classList.toggle('has-many-variants', state.mode === 'parallel' && records.length > 4);
     if (state.mode === 'parallel') createParallelView();
     else createSliderView();
     pairSelectors.hidden = state.mode !== 'slider';
@@ -569,18 +687,30 @@
 
   const renderMetadata = () => {
     metaContainer.style.setProperty('--variant-count', records.length);
+    metaContainer.style.setProperty('--meta-columns', calculateComparisonColumns(records.length));
+    metaContainer.classList.toggle('has-many-variants', records.length > 4);
     records.forEach((record) => {
       const card = document.createElement('article');
       const badge = document.createElement('span');
       badge.className = 'analyze-variant-badge';
-      badge.textContent = record.variant.id;
+      badge.textContent = record.displayId;
       const copy = document.createElement('div');
       const label = document.createElement('p');
-      label.textContent = record.variant.label || record.variant.id;
+      label.textContent = record.displayId;
       const filename = document.createElement('strong');
+      filename.className = 'analysis-meta-filename';
       filename.textContent = record.image.original_name;
       filename.title = record.image.original_name;
-      copy.append(label, filename);
+      copy.append(label);
+      const title = normalizeImageTitle(record.image.title);
+      if (title) {
+        const imageTitle = document.createElement('strong');
+        imageTitle.className = 'analysis-meta-title';
+        imageTitle.textContent = title;
+        imageTitle.title = title;
+        copy.append(imageTitle);
+      }
+      copy.append(filename);
       const detail = document.createElement('span');
       detail.className = 'analysis-meta-detail';
       detail.textContent = `${record.image.width} × ${record.image.height} · ${formatBytes(Number(record.image.size) || 0)}`;
@@ -594,7 +724,7 @@
       [leftSelect, rightSelect].forEach((select) => {
         const option = document.createElement('option');
         option.value = record.variant.id;
-        option.textContent = `${record.variant.id} · ${record.variant.label || record.variant.id}`;
+        option.textContent = record.displayId;
         select.append(option);
       });
     });
@@ -635,10 +765,18 @@
   }));
 
   document.addEventListener('keydown', (event) => {
+    if (
+      isFullscreenShortcut(event)
+      && !event.target.closest?.('textarea, select, input:not([type]), input[type="text"], input[type="search"], input[type="url"], input[type="email"], input[type="password"], [contenteditable="true"]')
+    ) {
+      event.preventDefault();
+      void toggleFullscreen();
+      return;
+    }
     if (event.target.closest('input, select, button') || event.target.closest('.analysis-divider')) return;
     const { viewport, record } = primaryContext();
     const key = event.key.toLowerCase();
-    if (key === 'f') resetView(false);
+    if (isFitShortcut(event)) resetView(false);
     else if (key === 'r') resetView(true);
     else if (key === '1') showActualPixels();
     else if (['+', '='].includes(event.key)) zoomAt(1.25, viewport, viewport.clientWidth / 2, viewport.clientHeight / 2, record);
@@ -657,6 +795,7 @@
     fullscreenButton.classList.toggle('is-active', active);
     fullscreenButton.setAttribute('aria-pressed', String(active));
     fullscreenLabel.textContent = active ? '退出全屏' : '全屏';
+    fullscreenButton.title = active ? '退出全屏（Shift + F）' : '全屏查看（Shift + F）';
     requestAnimationFrame(renderTransforms);
   };
   const leaveFauxFullscreen = () => {
@@ -664,7 +803,7 @@
     document.body.classList.remove('viewer-fullscreen');
     updateFullscreenButton();
   };
-  fullscreenButton.addEventListener('click', async () => {
+  async function toggleFullscreen() {
     if (workspace.classList.contains('is-faux-fullscreen')) {
       leaveFauxFullscreen();
       return;
@@ -688,7 +827,8 @@
       document.body.classList.add('viewer-fullscreen');
       updateFullscreenButton();
     }
-  });
+  }
+  fullscreenButton.addEventListener('click', toggleFullscreen);
   document.addEventListener('fullscreenchange', updateFullscreenButton);
   document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
   document.addEventListener('keydown', (event) => {

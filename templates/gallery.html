@@ -35,8 +35,8 @@
       </div>
       <div class="gallery-view-stats" aria-label="图集信息">
         <span><strong>{{ project.groups|length }}</strong> 组对比</span>
-        <span><i class="variant-dot variant-dot-a"></i>{{ variant_a.label }}</span>
-        <span><i class="variant-dot variant-dot-b"></i>{{ variant_b.label }}</span>
+        <span><i class="variant-dot variant-dot-a"></i>A</span>
+        <span><i class="variant-dot variant-dot-b"></i>B</span>
       </div>
     </section>
 
@@ -52,6 +52,8 @@
                   data-b-url="{{ image_b.url }}"
                   data-a-name="{{ image_a.original_name }}"
                   data-b-name="{{ image_b.original_name }}"
+                  data-a-title="{{ image_a.title|default('', true) }}"
+                  data-b-title="{{ image_b.title|default('', true) }}"
                   data-a-size="{{ image_a.size }}"
                   data-b-size="{{ image_b.size }}"
                   data-a-width="{{ image_a.width }}"
@@ -66,8 +68,14 @@
                 <img class="gallery-card-image gallery-card-image-a" data-src="{{ image_a.preview_url }}" alt="" decoding="async" draggable="false">
               </span>
               <span class="gallery-card-split" aria-hidden="true"></span>
-              <span class="gallery-card-label gallery-card-label-a">{{ variant_a.label }}</span>
-              <span class="gallery-card-label gallery-card-label-b">{{ variant_b.label }}</span>
+              <span class="gallery-card-label gallery-card-label-a">A</span>
+              <span class="gallery-card-label gallery-card-label-b">B</span>
+              {% if image_a.title|default('', true) %}
+                <span class="gallery-card-image-title gallery-card-image-title-a" title="{{ image_a.title }}">{{ image_a.title }}</span>
+              {% endif %}
+              {% if image_b.title|default('', true) %}
+                <span class="gallery-card-image-title gallery-card-image-title-b" title="{{ image_b.title }}">{{ image_b.title }}</span>
+              {% endif %}
             </span>
             <span class="gallery-card-copy">
               <strong>{{ group.title or ('第 ' ~ loop.index ~ ' 组') }}</strong>
@@ -112,20 +120,47 @@
       </header>
 
       <div class="gallery-dialog-viewer" id="dialog-viewer">
-        <div class="gallery-dialog-stage" id="dialog-stage" style="--position: 50%;">
+        <div class="gallery-dialog-toolbar" role="toolbar" aria-label="图集图片对比工具">
+          <div class="gallery-dialog-mode-indicator" aria-label="当前对比模式">
+            <span>滑杆对比</span>
+          </div>
+          <div class="gallery-dialog-view-actions">
+            <button type="button" data-gallery-action="fit" title="适应窗口（F）">适应</button>
+            <button type="button" data-gallery-action="actual" title="按原始像素显示（1）">100%</button>
+            <button type="button" data-gallery-action="zoom-out" aria-label="缩小" title="缩小（-）">−</button>
+            <output id="dialog-zoom" aria-live="polite">适应</output>
+            <button type="button" data-gallery-action="zoom-in" aria-label="放大" title="放大（+）">＋</button>
+            <button type="button" data-gallery-action="reset" title="复位视图（R）">复位</button>
+            <label class="gallery-dialog-title-size-control" for="dialog-title-size">
+              <span>标题字号</span>
+              <input id="dialog-title-size" type="range" min="10" max="32" step="1" value="16" aria-label="调整图片标题字号">
+              <output id="dialog-title-size-output" for="dialog-title-size" aria-live="polite">16px</output>
+            </label>
+            <button class="fullscreen-button" id="dialog-fullscreen" type="button" aria-pressed="false"
+                    aria-keyshortcuts="Shift+F" title="全屏查看图片对比（Shift + F）">
+              <span class="fullscreen-icon" aria-hidden="true"><i></i></span>
+              <span class="fullscreen-label">全屏</span>
+              <kbd class="fullscreen-shortcut" aria-hidden="true">Shift+F</kbd>
+            </button>
+          </div>
+        </div>
+        <div class="gallery-dialog-stage" id="dialog-stage" style="--position: 50%;" tabindex="0" role="group"
+             aria-label="滑杆对比视窗；拖动画布或使用方向键平移，滚轮缩放，F 适应窗口，R 复位，Shift+F 全屏">
           <span class="gallery-card-checker" aria-hidden="true"></span>
           <img class="gallery-dialog-image gallery-dialog-image-b" id="dialog-image-b" alt="" draggable="false">
-          <span class="gallery-dialog-image-a-wrap" aria-hidden="true">
+          <span class="gallery-dialog-image-a-wrap">
             <img class="gallery-dialog-image gallery-dialog-image-a" id="dialog-image-a" alt="" draggable="false">
           </span>
-          <span class="image-corner-label label-a" id="dialog-label-a">{{ variant_a.label }}</span>
-          <span class="image-corner-label label-b" id="dialog-label-b">{{ variant_b.label }}</span>
-          <span class="divider" aria-hidden="true"><span class="divider-line"></span><span class="divider-handle">↔</span></span>
-          <input class="comparison-range" id="dialog-range" type="range" min="0" max="100" value="50" step="0.1" aria-label="调整两张图片的分界位置">
-          <button class="fullscreen-button" id="dialog-fullscreen" type="button" aria-pressed="false" title="全屏查看图片对比">
-            <span class="fullscreen-icon" aria-hidden="true"><i></i></span>
-            <span class="fullscreen-label">全屏</span>
-          </button>
+          <span class="image-corner-label label-a" id="dialog-label-a">A</span>
+          <span class="image-corner-label label-b" id="dialog-label-b">B</span>
+          <span class="gallery-dialog-image-title gallery-dialog-image-title-a" id="dialog-image-title-a" hidden></span>
+          <span class="gallery-dialog-image-title gallery-dialog-image-title-b" id="dialog-image-title-b" hidden></span>
+          <div class="gallery-dialog-divider" id="dialog-divider" tabindex="0" role="slider"
+               aria-label="调整图片 A 与图片 B 的分界位置"
+               aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+            <i aria-hidden="true"></i>
+            <span aria-hidden="true">↔</span>
+          </div>
           <div class="image-loading" id="dialog-loading" aria-live="polite"><span></span> 正在载入原图…</div>
         </div>
       </div>
@@ -133,12 +168,12 @@
       <div class="gallery-dialog-meta">
         <article>
           <span class="slot-label">A</span>
-          <div><small>{{ variant_a.label }}</small><strong id="dialog-a-name"></strong></div>
+          <div><small>A</small><strong id="dialog-a-name"></strong></div>
           <span id="dialog-a-meta"></span>
         </article>
         <article>
           <span class="slot-label slot-label-alt">B</span>
-          <div><small>{{ variant_b.label }}</small><strong id="dialog-b-name"></strong></div>
+          <div><small>B</small><strong id="dialog-b-name"></strong></div>
           <span id="dialog-b-meta"></span>
         </article>
       </div>
