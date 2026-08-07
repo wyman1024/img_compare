@@ -54,8 +54,29 @@
 | `DATA_DIR` | 项目内的 `data` | 项目和草稿保存目录 |
 | `OPEN_BROWSER` | `1` | 设为 `0` 时启动后不自动打开浏览器 |
 | `SHARE_BASE_URL` | 自动识别 | 多网卡时指定分享地址，如 `http://192.168.1.20:8000` |
+| `FEISHU_VERIFICATION_TOKEN` | 空 | 飞书回调 Verification Token；设置后会拒绝 token 不匹配的请求，建议生产环境配置 |
+| `FEISHU_PREVIEW_IMAGE_KEY` | 空 | 可选的飞书图片 key，用作链接标题前的统一小图标；不设置时只显示标题 |
 
 例如要改用 9000 端口，可先在命令提示符执行 `set PORT=9000`，再运行 `start.bat`。
+
+## 飞书链接预览
+
+服务提供 `POST /api/feishu/link-preview` 回调，支持当前两类分享页面：
+
+- 图片对比：`/analyze/<项目 ID>`
+- 批量图集：`/gallery/<项目 ID>`
+
+已有的 `/compare/<项目 ID>` 双图对比链接也可以生成预览。预览标题优先使用项目标题，并附加“图片对比”或“批量图集”；没有项目标题时使用模式名。`FEISHU_PREVIEW_IMAGE_KEY` 只用于统一前缀图标，不会把项目原图上传到飞书。
+
+配置步骤：
+
+1. 先通过公司网关或反向代理为服务提供飞书开放平台可访问的 HTTP(S) 地址。只在局域网可达的回调地址无法接收飞书服务端请求。
+2. 在飞书应用的“链接预览”能力中注册 `https://你的域名/analyze/*` 和 `https://你的域名/gallery/*` 两条 URL 规则。如仍在分享 `/compare/` 链接，再添加 `https://你的域名/compare/*`。
+3. 在“事件与回调 → 回调配置”中，将请求地址设为 `https://你的域名/api/feishu/link-preview`，并订阅“链接预览 → 拉取链接预览数据（`url.preview.get`）”。
+4. 建议把飞书后台的 Verification Token 配置为启动环境变量 `FEISHU_VERIFICATION_TOKEN`。当前服务不解密加密回调，因此 **Encrypt Key 需要留空**。
+5. 发布应用使配置生效。在飞书消息中发送一个已发布的图片对比或批量图集完整 URL，即可看到标题预览。
+
+如需前缀图标，可先通过飞书“上传图片”接口获得 `image_key`，再设置 `FEISHU_PREVIEW_IMAGE_KEY`。该项不影响链接预览的基本功能。
 
 ## 开发与测试
 

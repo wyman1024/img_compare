@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 from flask import Flask, abort, jsonify, render_template, request, send_file
 from werkzeug.exceptions import RequestEntityTooLarge
 
+from feishu_preview import register_feishu_preview_routes
 from project_store import (
     DEFAULT_DRAFT_TTL_SECONDS,
     DEFAULT_MAX_PROJECT_BYTES,
@@ -87,6 +88,12 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         PREVIEW_QUALITY=_positive_env_int(
             "PREVIEW_QUALITY", DEFAULT_PREVIEW_QUALITY
         ),
+        FEISHU_VERIFICATION_TOKEN=os.environ.get(
+            "FEISHU_VERIFICATION_TOKEN", ""
+        ).strip(),
+        FEISHU_PREVIEW_IMAGE_KEY=os.environ.get(
+            "FEISHU_PREVIEW_IMAGE_KEY", ""
+        ).strip(),
     )
     if test_config:
         app.config.update(test_config)
@@ -110,6 +117,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     app.config["DRAFTS_DIR"] = str(project_store.drafts_dir)
     app.extensions["project_store"] = project_store
     register_project_routes(app, project_store)
+    register_feishu_preview_routes(app, project_store)
     app.json.ensure_ascii = False
 
     def api_error(
