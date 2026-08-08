@@ -923,7 +923,8 @@ def _share_url(app: Flask, relative_url: str) -> str:
         except ValueError:
             pass
     lan_base_url = app.config.get("LAN_BASE_URL")
-    if is_loopback and lan_base_url:
+    use_configured_base = bool(app.config.get("SHARE_BASE_URL_CONFIGURED"))
+    if lan_base_url and (use_configured_base or is_loopback):
         share_url = f"{str(lan_base_url).rstrip('/')}{relative_url}"
     return share_url
 

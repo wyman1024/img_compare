@@ -17,7 +17,7 @@
       <span>像素对照台</span>
     </a>
     <div class="compare-actions">
-      <button class="copy-button" id="copy-analysis-link" type="button" aria-live="polite">
+      <button class="copy-button" id="copy-analysis-link" type="button" aria-live="polite" data-share-url="{{ share_url }}">
         <span class="copy-icon" aria-hidden="true"></span>
         <span class="copy-label">复制此页链接</span>
       </button>
@@ -82,10 +82,6 @@
 
     <section class="analysis-variant-meta" id="analysis-variant-meta" aria-label="素材信息"></section>
 
-    <label class="share-field analysis-share-field" for="analysis-share-url">
-      <span>分享地址</span>
-      <input id="analysis-share-url" type="text" value="{{ share_url }}" readonly spellcheck="false" autocomplete="off">
-    </label>
   </main>
 
   <footer class="compare-footer shell-wide">

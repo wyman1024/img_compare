@@ -53,30 +53,52 @@
 | `PREVIEW_QUALITY` | `82` | WebP 预览质量（1–100） |
 | `DATA_DIR` | 项目内的 `data` | 项目和草稿保存目录 |
 | `OPEN_BROWSER` | `1` | 设为 `0` 时启动后不自动打开浏览器 |
-| `SHARE_BASE_URL` | 自动识别 | 多网卡时指定分享地址，如 `http://192.168.1.20:8000` |
-| `FEISHU_VERIFICATION_TOKEN` | 空 | 飞书回调 Verification Token；设置后会拒绝 token 不匹配的请求，建议生产环境配置 |
+| `SHARE_BASE_URL` | 自动识别 | 指定分享地址；飞书预览需使用公司内网 FQDN，如 `http://jz-tools-server.corp.example.com:8000` |
+| `FEISHU_APP_ID` | 空 | 企业自建应用的 App ID；与 App Secret 同时设置后启用飞书长连接预览 |
+| `FEISHU_APP_SECRET` | 空 | 企业自建应用的 App Secret；仅保存在服务机器的启动环境中 |
 | `FEISHU_PREVIEW_IMAGE_KEY` | 空 | 可选的飞书图片 key，用作链接标题前的统一小图标；不设置时只显示标题 |
 
 例如要改用 9000 端口，可先在命令提示符执行 `set PORT=9000`，再运行 `start.bat`。
 
-## 飞书链接预览
+## 飞书链接预览（内网长连接）
 
-服务提供 `POST /api/feishu/link-preview` 回调，支持当前两类分享页面：
+服务通过飞书官方 SDK 主动建立 WebSocket 长连接。只要服务机器能够访问公网，就不需要公网 IP、域名、Webhook 请求地址或内网穿透，也不需要启用机器人能力。当前支持两类分享页面：
 
 - 图片对比：`/analyze/<项目 ID>`
 - 批量图集：`/gallery/<项目 ID>`
 
-已有的 `/compare/<项目 ID>` 双图对比链接也可以生成预览。预览标题优先使用项目标题，并附加“图片对比”或“批量图集”；没有项目标题时使用模式名。`FEISHU_PREVIEW_IMAGE_KEY` 只用于统一前缀图标，不会把项目原图上传到飞书。
+已有的 `/compare/<项目 ID>` 双图对比链接也可以生成预览。回调在内网进程中直接读取项目元数据，标题优先使用项目标题，并附加“图片对比”或“批量图集”；没有项目标题时使用模式名。`FEISHU_PREVIEW_IMAGE_KEY` 只用于统一前缀图标，不会把项目原图上传到飞书。
 
 配置步骤：
 
-1. 先通过公司网关或反向代理为服务提供飞书开放平台可访问的 HTTP(S) 地址。只在局域网可达的回调地址无法接收飞书服务端请求。
-2. 在飞书应用的“链接预览”能力中注册 `https://你的域名/analyze/*` 和 `https://你的域名/gallery/*` 两条 URL 规则。如仍在分享 `/compare/` 链接，再添加 `https://你的域名/compare/*`。
-3. 在“事件与回调 → 回调配置”中，将请求地址设为 `https://你的域名/api/feishu/link-preview`，并订阅“链接预览 → 拉取链接预览数据（`url.preview.get`）”。
-4. 建议把飞书后台的 Verification Token 配置为启动环境变量 `FEISHU_VERIFICATION_TOKEN`。当前服务不解密加密回调，因此 **Encrypt Key 需要留空**。
-5. 发布应用使配置生效。在飞书消息中发送一个已发布的图片对比或批量图集完整 URL，即可看到标题预览。
+1. 为服务准备公司内网可解析的完整域名，例如 `jz-tools-server.corp.example.com`，并设置 `SHARE_BASE_URL=http://jz-tools-server.corp.example.com:8000`。飞书 URL 规则不接受 IP 或 `jz-tools-server` 这种单段主机名；端口 `8000` 可以保留。
+2. 创建 **企业自建应用**，在“应用能力”中添加“链接预览”。长连接暂不支持商店应用。
+3. 在链接预览能力中注册以下 URL 规则。配置时不要写 `http://` 或 `https://`；无通配符规则会自动匹配所有子路径。
+
+   ```text
+   jz-tools-server.corp.example.com:8000/analyze
+   jz-tools-server.corp.example.com:8000/gallery
+   ```
+
+   如仍在分享 `/compare/` 链接，再添加 `jz-tools-server.corp.example.com:8000/compare`。
+4. 从应用“凭证与基础信息”获取 App ID 和 App Secret。复制 `config.local.bat.example` 为 `config.local.bat`，填写 `SHARE_BASE_URL`、`FEISHU_APP_ID`、`FEISHU_APP_SECRET`。该本机配置文件已被 Git 忽略；两项凭证必须同时设置。
+5. 启动服务。窗口显示“飞书预览：长连接正在建立”，随后 SDK 日志出现 `connected to wss://...`，表示内网服务已连上飞书。
+6. 在飞书开发者后台进入“事件与回调 → 回调配置”，将订阅方式改为 **使用长连接接收回调**。保存时本服务必须正在运行并已连接。
+7. 添加“链接预览 → 拉取链接预览数据（`url.preview.get`）”回调，然后创建并发布正式应用版本。测试版本不支持链接预览，且预览只对应用可用范围内的用户生效。
+8. 在飞书中重新发送以 `http://` 或 `https://` 开头、使用上述完整内网域名的项目 URL。
+
+也可以不创建配置文件，改为在命令提示符中临时配置并启动：
+
+```bat
+set SHARE_BASE_URL=http://jz-tools-server.corp.example.com:8000
+set FEISHU_APP_ID=cli_xxx
+set FEISHU_APP_SECRET=你的_App_Secret
+start.bat
+```
 
 如需前缀图标，可先通过飞书“上传图片”接口获得 `image_key`，再设置 `FEISHU_PREVIEW_IMAGE_KEY`。该项不影响链接预览的基本功能。
+
+官方参考：[使用长连接接收回调](https://open.feishu.cn/document/event-subscription-guide/callback-subscription/step-1-choose-a-subscription-mode/configure-callback-request-address?lang=zh-CN)、[链接预览开发指南](https://open.feishu.cn/document/development-link-preview/link-preview-development-guide?lang=zh-CN)。
 
 ## 开发与测试
 

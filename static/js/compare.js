@@ -17,7 +17,7 @@
   const images = [...stage.querySelectorAll('.compare-image')];
   const copyButton = document.querySelector('#copy-button');
   const copyLabel = copyButton.querySelector('.copy-label');
-  const shareInput = document.querySelector('#share-url');
+  const shareUrl = copyButton.dataset.shareUrl;
   const ratioNote = document.querySelector('#ratio-note');
 
   const setPosition = (value) => stage.style.setProperty('--position', `${value}%`);
@@ -123,17 +123,42 @@
   });
 
   const fallbackCopy = () => {
-    shareInput.focus();
-    shareInput.select();
-    shareInput.setSelectionRange(0, shareInput.value.length);
-    const copied = document.execCommand('copy');
-    return copied;
+    const textarea = document.createElement('textarea');
+    textarea.value = shareUrl;
+    textarea.readOnly = true;
+    textarea.style.position = 'fixed';
+    textarea.style.top = '0';
+    textarea.style.left = '0';
+    textarea.style.width = '1px';
+    textarea.style.height = '1px';
+    textarea.style.opacity = '0';
+    textarea.style.pointerEvents = 'none';
+    document.body.append(textarea);
+    try {
+      textarea.select();
+      textarea.setSelectionRange(0, textarea.value.length);
+      return document.execCommand('copy');
+    } finally {
+      textarea.remove();
+      copyButton.focus({ preventScroll: true });
+    }
+  };
+
+  const copyShareUrl = async () => {
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        return true;
+      } catch {
+        // Continue with the synchronous fallback when clipboard permission is unavailable.
+      }
+    }
+    return fallbackCopy();
   };
 
   copyButton.addEventListener('click', async () => {
     try {
-      if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(shareInput.value);
-      else if (!fallbackCopy()) throw new Error('copy failed');
+      if (!await copyShareUrl()) throw new Error('copy failed');
       copyButton.classList.add('is-copied');
       copyLabel.textContent = '链接已复制';
       window.setTimeout(() => {
@@ -141,9 +166,7 @@
         copyLabel.textContent = '复制此页链接';
       }, 1800);
     } catch {
-      shareInput.focus();
-      shareInput.select();
-      copyLabel.textContent = '地址已选中，请复制';
+      copyLabel.textContent = '复制失败，请重试';
     }
   });
 

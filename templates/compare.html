@@ -15,7 +15,7 @@
       <span>像素对照台</span>
     </a>
     <div class="compare-actions">
-      <button class="copy-button" id="copy-button" type="button" aria-live="polite">
+      <button class="copy-button" id="copy-button" type="button" aria-live="polite" data-share-url="{{ share_url }}">
         <span class="copy-icon" aria-hidden="true"></span>
         <span class="copy-label">复制此页链接</span>
       </button>
@@ -92,10 +92,6 @@
       </article>
     </section>
     <p class="ratio-note" id="ratio-note" hidden>两张图片的尺寸或比例不同，已居中适配且不会拉伸。</p>
-    <label class="share-field" for="share-url">
-      <span>分享地址</span>
-      <input id="share-url" type="text" value="{{ share_url }}" readonly spellcheck="false" autocomplete="off">
-    </label>
   </main>
 
   <footer class="compare-footer shell-wide">

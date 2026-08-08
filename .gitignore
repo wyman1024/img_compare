@@ -1,6 +1,7 @@
 .venv/
 __pycache__/
 .pytest_cache/
+config.local.bat
 *.py[cod]
 data/comparisons/
 data/projects/

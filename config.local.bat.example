@@ -1,0 +1,10 @@
+@echo off
+rem 复制本文件为 config.local.bat，填写真实值后双击 start.bat。
+rem config.local.bat 已被 Git 忽略，不要把 App Secret 提交到仓库。
+
+set "SHARE_BASE_URL=http://jz-tools-server.corp.example.com:8000"
+set "FEISHU_APP_ID=cli_xxx"
+set "FEISHU_APP_SECRET=替换为真实_App_Secret"
+
+rem 可选：飞书链接标题前的统一图标。
+rem set "FEISHU_PREVIEW_IMAGE_KEY=img_xxx"

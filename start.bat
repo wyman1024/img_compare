@@ -4,6 +4,8 @@ setlocal
 cd /d "%~dp0"
 title 像素对照台
 
+if exist "config.local.bat" call "config.local.bat"
+
 if exist ".venv\Scripts\python.exe" goto install
 
 echo [首次运行] 正在准备 Python 环境...
@@ -20,7 +22,7 @@ python -m venv .venv
 if errorlevel 1 goto venv_failed
 
 :install
-".venv\Scripts\python.exe" -c "import sys; from importlib.metadata import version; v=lambda n:tuple(int(x) for x in version(n).split('.')[:2]); raise SystemExit(0 if sys.version_info >= (3,10) and (3,1) <= v('Flask') < (4,0) and (11,0) <= v('Pillow') < (13,0) and (3,0) <= v('waitress') < (4,0) else 1)" >nul 2>nul
+".venv\Scripts\python.exe" -c "import sys; from importlib.metadata import version; v=lambda n:tuple(int(x) for x in version(n).split('.')[:2]); raise SystemExit(0 if sys.version_info >= (3,10) and (3,1) <= v('Flask') < (4,0) and (11,0) <= v('Pillow') < (13,0) and (3,0) <= v('waitress') < (4,0) and (1,7) <= v('lark-oapi') < (2,0) else 1)" >nul 2>nul
 if not errorlevel 1 goto run_server
 
 echo [首次运行] 正在安装运行组件...

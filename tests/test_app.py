@@ -222,6 +222,9 @@ def test_gallery_and_multi_pages_receive_persisted_image_titles(client):
     assert 'id="analysis-fullscreen"' in fullscreen_toolbar
     assert 'aria-keyshortcuts="Shift+F"' in fullscreen_toolbar
     assert "Shift+F" in fullscreen_toolbar
+    assert f'data-share-url="http://localhost{multi["url"]}"' in multi_html
+    assert 'id="analysis-share-url"' not in multi_html
+    assert "分享地址" not in multi_html
 
 
 def test_pair_draft_publishes_fullscreen_page_and_survives_restart(
@@ -250,6 +253,9 @@ def test_pair_draft_publishes_fullscreen_page_and_survives_restart(
     assert 'aria-keyshortcuts="Shift+F"' in html
     assert "Shift + F" in html
     assert 'data-dimensions="1 × 1"' in html
+    assert f'data-share-url="http://localhost{published["url"]}"' in html
+    assert 'id="share-url"' not in html
+    assert "分享地址" not in html
     assert restarted.get(f"/media/{project_id}/image_a").data == PNG_1X1
     assert restarted.get(f"/media/{project_id}/image_b").data == GIF_1X1
 
@@ -259,12 +265,12 @@ def test_loopback_share_address_uses_configured_lan_url(app):
     published = _publish_pair(app.test_client())
 
     loopback = app.test_client().get(published["url"]).get_data(as_text=True)
-    assert f'value="http://192.168.50.14:8000{published["url"]}"' in loopback
+    assert f'data-share-url="http://192.168.50.14:8000{published["url"]}"' in loopback
 
     lan = app.test_client().get(
         published["url"], base_url="http://192.168.50.99:8000"
     ).get_data(as_text=True)
-    assert f'value="http://192.168.50.99:8000{published["url"]}"' in lan
+    assert f'data-share-url="http://192.168.50.99:8000{published["url"]}"' in lan
 
 
 def test_v1_data_is_left_in_place_but_cannot_be_read_or_uploaded(app):

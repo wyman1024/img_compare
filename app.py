@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 from flask import Flask, abort, jsonify, render_template, request, send_file
 from werkzeug.exceptions import RequestEntityTooLarge
 
-from feishu_preview import register_feishu_preview_routes
+from feishu_long_connection import start_feishu_long_connection, validate_feishu_config
 from project_store import (
     DEFAULT_DRAFT_TTL_SECONDS,
     DEFAULT_MAX_PROJECT_BYTES,
@@ -64,6 +64,7 @@ def _validate_storage_config(app: Flask) -> None:
 
 def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     project_dir = Path(__file__).resolve().parent
+    configured_share_base_url = os.environ.get("SHARE_BASE_URL", "").strip()
     default_max_image_bytes = _positive_env_int(
         "MAX_IMAGE_BYTES", DEFAULT_MAX_IMAGE_BYTES
     )
@@ -75,7 +76,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         MIN_FREE_DISK_BYTES=_positive_env_int(
             "MIN_FREE_DISK_BYTES", DEFAULT_MIN_FREE_DISK_BYTES
         ),
-        LAN_BASE_URL=os.environ.get("SHARE_BASE_URL", "").strip() or None,
+        LAN_BASE_URL=configured_share_base_url or None,
+        SHARE_BASE_URL_CONFIGURED=bool(configured_share_base_url),
         MAX_PROJECT_BYTES=_positive_env_int(
             "MAX_PROJECT_BYTES", DEFAULT_MAX_PROJECT_BYTES
         ),
@@ -88,9 +90,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         PREVIEW_QUALITY=_positive_env_int(
             "PREVIEW_QUALITY", DEFAULT_PREVIEW_QUALITY
         ),
-        FEISHU_VERIFICATION_TOKEN=os.environ.get(
-            "FEISHU_VERIFICATION_TOKEN", ""
-        ).strip(),
+        FEISHU_APP_ID=os.environ.get("FEISHU_APP_ID", "").strip(),
+        FEISHU_APP_SECRET=os.environ.get("FEISHU_APP_SECRET", "").strip(),
         FEISHU_PREVIEW_IMAGE_KEY=os.environ.get(
             "FEISHU_PREVIEW_IMAGE_KEY", ""
         ).strip(),
@@ -98,6 +99,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     if test_config:
         app.config.update(test_config)
     _validate_storage_config(app)
+    validate_feishu_config(app)
 
     if not test_config or "MAX_CONTENT_LENGTH" not in test_config:
         app.config["MAX_CONTENT_LENGTH"] = (
@@ -117,7 +119,6 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     app.config["DRAFTS_DIR"] = str(project_store.drafts_dir)
     app.extensions["project_store"] = project_store
     register_project_routes(app, project_store)
-    register_feishu_preview_routes(app, project_store)
     app.json.ensure_ascii = False
 
     def api_error(
@@ -196,7 +197,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             except ValueError:
                 pass
         lan_base_url = app.config.get("LAN_BASE_URL")
-        if is_loopback and lan_base_url:
+        use_configured_base = bool(app.config.get("SHARE_BASE_URL_CONFIGURED"))
+        if lan_base_url and (use_configured_base or is_loopback):
             share_url = f"{str(lan_base_url).rstrip('/')}{comparison['url']}"
         return render_template(
             "compare.html", comparison=comparison, share_url=share_url
@@ -223,6 +225,7 @@ app = create_app()
 
 
 if __name__ == "__main__":
+    start_feishu_long_connection(app)
     app.run(
         host=os.environ.get("HOST", "0.0.0.0"),
         port=_positive_env_int("PORT", 8000),

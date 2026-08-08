@@ -1170,10 +1170,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.analysis-share-field {
-  margin-top: 16px;
-}
-
 @media (max-width: 1180px) {
   .analyze-slot-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

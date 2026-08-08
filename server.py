@@ -10,6 +10,7 @@ import webbrowser
 from waitress import create_server
 
 from app import app
+from feishu_long_connection import start_feishu_long_connection
 
 
 def _positive_port(raw_value: str) -> int:
@@ -72,6 +73,7 @@ def main() -> None:
         threads=8,
         max_request_body_size=int(app.config["MAX_CONTENT_LENGTH"]),
     )
+    feishu_thread = start_feishu_long_connection(app)
 
     print()
     print("  像素对照台已启动")
@@ -83,6 +85,12 @@ def main() -> None:
             print(f"  {label}： http://{address}:{port}")
     else:
         print("  未自动找到局域网 IP；可用 ipconfig 查看本机 IPv4 地址。")
+    if app.config.get("SHARE_BASE_URL_CONFIGURED"):
+        print(f"  固定分享地址： {preferred_url}")
+    if feishu_thread is None:
+        print("  飞书预览：未配置长连接")
+    else:
+        print("  飞书预览：长连接正在建立（无需公网回调）")
     print("  首次出现防火墙提示时，请允许在“专用网络”中通信。")
     print("  关闭此窗口即可停止服务。")
     print("  ─────────────────────────────────")

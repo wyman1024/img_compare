@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import base64
 import io
+import threading
 
 import pytest
 
-from feishu_preview import FEISHU_PREVIEW_CALLBACK_PATH
+import feishu_long_connection
+from feishu_long_connection import (
+    _create_feishu_client,
+    build_url_preview_handler,
+    start_feishu_long_connection,
+)
+from feishu_preview import resolve_preview_inline
 
 
 PNG_1X1 = base64.b64decode(
@@ -67,44 +74,6 @@ def _publish(client, kind: str, *, title: str = "") -> dict:
     return finalized.get_json()
 
 
-def _event(url: str, *, token: str | None = None, event_type: str = "url.preview.get"):
-    header = {"event_type": event_type}
-    if token is not None:
-        header["token"] = token
-    return {
-        "schema": "2.0",
-        "header": header,
-        "event": {"host": "im_message", "context": {"url": url}},
-    }
-
-
-def test_feishu_callback_verifies_challenge_and_token(app):
-    app.config["FEISHU_VERIFICATION_TOKEN"] = "verification-secret"
-    client = app.test_client()
-
-    verified = client.post(
-        FEISHU_PREVIEW_CALLBACK_PATH,
-        json={
-            "type": "url_verification",
-            "token": "verification-secret",
-            "challenge": "challenge-value",
-        },
-    )
-    assert verified.status_code == 200
-    assert verified.get_json() == {"challenge": "challenge-value"}
-
-    rejected = client.post(
-        FEISHU_PREVIEW_CALLBACK_PATH,
-        json={
-            "type": "url_verification",
-            "token": "wrong-secret",
-            "challenge": "challenge-value",
-        },
-    )
-    assert rejected.status_code == 403
-    assert rejected.get_json()["error"]["code"] == "invalid_verification_token"
-
-
 @pytest.mark.parametrize(
     ("kind", "title", "expected_title"),
     [
@@ -112,41 +81,46 @@ def test_feishu_callback_verifies_challenge_and_token(app):
         ("gallery", "角色动作批次", "角色动作批次 · 批量图集"),
     ],
 )
-def test_feishu_preview_supports_both_current_share_modes(
+def test_resolver_supports_both_current_share_modes(
     app, kind, title, expected_title
 ):
-    app.config["FEISHU_VERIFICATION_TOKEN"] = "verification-secret"
-    app.config["FEISHU_PREVIEW_IMAGE_KEY"] = "  img_test_icon  "
-    client = app.test_client()
-    published = _publish(client, kind, title=title)
+    published = _publish(app.test_client(), kind, title=title)
+    store = app.extensions["project_store"]
 
-    response = client.post(
-        FEISHU_PREVIEW_CALLBACK_PATH,
-        json=_event(
-            f"https://compare.example.com{published['url']}?from=feishu#detail",
-            token="verification-secret",
-        ),
+    inline = resolve_preview_inline(
+        store,
+        f"http://jz-tools-server.corp.example.com:8000{published['url']}?x=1#view",
+        image_key="  img_test_icon  ",
     )
 
-    assert response.status_code == 200
-    assert response.get_json() == {
-        "inline": {
-            "title": expected_title,
-            "image_key": "img_test_icon",
-        }
-    }
+    assert inline == {"title": expected_title, "image_key": "img_test_icon"}
 
 
-def test_feishu_preview_keeps_pair_share_urls_and_title_fallback(client):
-    published = _publish(client, "pair")
+def test_resolver_keeps_pair_urls_and_falls_back_to_mode_title(app):
+    published = _publish(app.test_client(), "pair")
 
-    response = client.post(
-        FEISHU_PREVIEW_CALLBACK_PATH,
-        json=_event(f"http://192.168.1.20:8000{published['url']}"),
+    inline = resolve_preview_inline(
+        app.extensions["project_store"],
+        f"http://jz-tools-server.corp.example.com:8000{published['url']}",
     )
 
-    assert response.status_code == 200
-    assert response.get_json() == {"inline": {"title": "图片对比"}}
+    assert inline == {"title": "图片对比"}
+
+
+def test_explicit_share_base_url_replaces_legacy_request_hostname(app):
+    app.config.update(
+        LAN_BASE_URL="http://jz-tools-server.corp.example.com:8000",
+        SHARE_BASE_URL_CONFIGURED=True,
+    )
+    published = _publish(app.test_client(), "pair")
+
+    page = app.test_client().get(
+        published["url"],
+        base_url="http://jz-tools-server:8000",
+    )
+
+    expected = f'http://jz-tools-server.corp.example.com:8000{published["url"]}'
+    assert f'data-share-url="{expected}"' in page.get_data(as_text=True)
 
 
 @pytest.mark.parametrize(
@@ -156,20 +130,131 @@ def test_feishu_preview_keeps_pair_share_urls_and_title_fallback(client):
         "https://compare.example.com/analyze/not-a-project",
         "file:///analyze/AAAAAAAAAAAAAAAAAAAAAAAA",
         "/analyze/AAAAAAAAAAAAAAAAAAAAAAAA",
+        "https://user@example.com/analyze/AAAAAAAAAAAAAAAAAAAAAAAA",
     ],
 )
-def test_feishu_preview_ignores_urls_that_are_not_published_projects(client, url):
-    response = client.post(FEISHU_PREVIEW_CALLBACK_PATH, json=_event(url))
-
-    assert response.status_code == 200
-    assert response.get_json() == {}
+def test_resolver_ignores_urls_that_are_not_published_projects(app, url):
+    assert resolve_preview_inline(app.extensions["project_store"], url) is None
 
 
-def test_feishu_preview_rejects_encrypted_callbacks(client):
-    response = client.post(
-        FEISHU_PREVIEW_CALLBACK_PATH,
-        json={"encrypt": "encrypted-body"},
+def test_resolver_rejects_route_kind_mismatch(app):
+    published = _publish(app.test_client(), "multi", title="路由校验")
+    project_id = published["id"]
+
+    inline = resolve_preview_inline(
+        app.extensions["project_store"],
+        f"https://compare.example.com/gallery/{project_id}",
     )
 
-    assert response.status_code == 400
-    assert response.get_json()["error"]["code"] == "encrypted_callback_not_supported"
+    assert inline is None
+
+
+def test_sdk_handler_returns_official_response_model(app):
+    from lark_oapi.event.callback.model.p2_url_preview_get import (
+        P2URLPreviewGet,
+        P2URLPreviewGetResponse,
+    )
+
+    published = _publish(app.test_client(), "multi", title="SDK 回调")
+    handler = build_url_preview_handler(
+        app.extensions["project_store"],
+        image_key="img_sdk_icon",
+        response_class=P2URLPreviewGetResponse,
+    )
+    event = P2URLPreviewGet(
+        {
+            "event": {
+                "context": {
+                    "url": f"http://jz-tools-server.corp.example.com:8000{published['url']}"
+                }
+            }
+        }
+    )
+
+    response = handler(event)
+
+    assert response.inline.title == "SDK 回调 · 图片对比"
+    assert response.inline.image_key == "img_sdk_icon"
+
+
+def test_long_connection_is_disabled_without_credentials(app):
+    assert start_feishu_long_connection(app) is None
+    assert "feishu_preview_thread" not in app.extensions
+
+
+@pytest.mark.parametrize(
+    ("app_id", "app_secret"),
+    [("cli_test", ""), ("", "secret")],
+)
+def test_partial_long_connection_credentials_fail_at_startup(
+    app_module, tmp_path, app_id, app_secret
+):
+    with pytest.raises(RuntimeError, match="必须同时配置"):
+        app_module.create_app(
+            {
+                "TESTING": True,
+                "DATA_DIR": str(tmp_path / "partial-feishu-config"),
+                "MIN_FREE_DISK_BYTES": 1,
+                "FEISHU_APP_ID": app_id,
+                "FEISHU_APP_SECRET": app_secret,
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "share_base_url",
+    [
+        None,
+        "http://jz-tools-server:8000",
+        "http://192.168.50.96:8000",
+        "jz-tools-server.corp.example.com:8000",
+    ],
+)
+def test_feishu_requires_a_full_share_domain(
+    app_module, tmp_path, share_base_url
+):
+    with pytest.raises(RuntimeError, match="SHARE_BASE_URL"):
+        app_module.create_app(
+            {
+                "TESTING": True,
+                "DATA_DIR": str(tmp_path / "invalid-feishu-share-host"),
+                "MIN_FREE_DISK_BYTES": 1,
+                "FEISHU_APP_ID": "cli_test",
+                "FEISHU_APP_SECRET": "secret",
+                "LAN_BASE_URL": share_base_url,
+            }
+        )
+
+
+def test_long_connection_starts_background_worker_without_network(
+    app, monkeypatch: pytest.MonkeyPatch
+):
+    worker_called = threading.Event()
+    app.config.update(
+        FEISHU_APP_ID="cli_test",
+        FEISHU_APP_SECRET="secret",
+        LAN_BASE_URL="http://jz-tools-server.corp.example.com:8000",
+    )
+    monkeypatch.setattr(
+        feishu_long_connection,
+        "_run_feishu_client",
+        lambda _app, _store: worker_called.set(),
+    )
+
+    thread = start_feishu_long_connection(app)
+    thread.join(timeout=2)
+
+    assert worker_called.is_set()
+    assert app.extensions["feishu_preview_thread"] is thread
+
+
+def test_official_sdk_client_can_be_constructed_without_connecting(app):
+    app.config.update(
+        FEISHU_APP_ID="cli_test",
+        FEISHU_APP_SECRET="secret",
+        LAN_BASE_URL="http://jz-tools-server.corp.example.com:8000",
+    )
+
+    client = _create_feishu_client(app, app.extensions["project_store"])
+
+    assert client is not None
