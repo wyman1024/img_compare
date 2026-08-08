@@ -57,11 +57,15 @@ def _preview_title(project: dict[str, Any]) -> str:
     mode_label = KIND_LABELS[project["kind"]]
     project_title = project.get("title")
     if not isinstance(project_title, str) or not project_title.strip():
-        return mode_label
-    project_title = project_title.strip()
-    if project_title == mode_label:
-        return project_title
-    return f"{project_title} · {mode_label}"
+        content_title = mode_label
+    else:
+        project_title = project_title.strip()
+        content_title = (
+            project_title
+            if project_title == mode_label
+            else f"{project_title} · {mode_label}"
+        )
+    return f"{content_title} · {TOOL_NAME}"
 
 
 def resolve_preview_inline(
@@ -99,10 +103,6 @@ def build_preview_response(
         "type": "raw",
         "data": {
             "config": {"wide_screen_mode": True},
-            "header": {
-                "template": "blue",
-                "title": {"tag": "plain_text", "content": TOOL_NAME},
-            },
             "elements": [
                 {
                     "tag": "img",

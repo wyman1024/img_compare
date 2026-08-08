@@ -80,8 +80,8 @@ def _publish(client, kind: str, *, title: str = "") -> dict:
 @pytest.mark.parametrize(
     ("kind", "title", "expected_title"),
     [
-        ("multi", "首页视觉走查", "首页视觉走查 · 图片对比"),
-        ("gallery", "角色动作批次", "角色动作批次 · 批量图集"),
+        ("multi", "首页视觉走查", "首页视觉走查 · 图片对比 · 像素对照台"),
+        ("gallery", "角色动作批次", "角色动作批次 · 批量图集 · 像素对照台"),
     ],
 )
 def test_resolver_supports_both_current_share_modes(
@@ -107,7 +107,7 @@ def test_resolver_keeps_pair_urls_and_falls_back_to_mode_title(app):
         f"http://jz-tools-server.corp.example.com:8000{published['url']}",
     )
 
-    assert inline == {"title": "图片对比"}
+    assert inline == {"title": "图片对比 · 像素对照台"}
 
 
 def test_explicit_share_base_url_replaces_legacy_request_hostname(app):
@@ -176,7 +176,7 @@ def test_sdk_handler_returns_official_response_model(app):
 
     response = handler(event)
 
-    assert response.inline.title == "SDK 回调 · 图片对比"
+    assert response.inline.title == "SDK 回调 · 图片对比 · 像素对照台"
     assert response.inline.image_key == "img_sdk_icon"
 
 
@@ -244,11 +244,10 @@ def test_sdk_handler_returns_raw_image_card_when_cover_is_cached(app):
 
     response = handler(event)
 
-    assert response.inline.title == "首页走查 · 图片对比"
+    assert response.inline.title == "首页走查 · 图片对比 · 像素对照台"
     assert response.inline.image_key == "img_inline_icon"
     assert response.card.type == "raw"
-    assert response.card.data["header"]["title"]["content"] == "像素对照台"
-    assert response.card.data["header"]["title"]["content"] != response.inline.title
+    assert "header" not in response.card.data
     assert response.card.data["elements"][0]["img_key"] == "img_v3_card_cover"
     assert response.card.data["elements"][0]["mode"] == "fit_horizontal"
     assert response.card.data["elements"][1]["actions"][0]["url"] == raw_url
@@ -257,12 +256,12 @@ def test_sdk_handler_returns_raw_image_card_when_cover_is_cached(app):
 @pytest.mark.parametrize(
     ("kind", "title", "expected_inline"),
     [
-        ("pair", "", "图片对比"),
-        ("multi", "首页走查", "首页走查 · 图片对比"),
-        ("gallery", "角色批次", "角色批次 · 批量图集"),
+        ("pair", "", "图片对比 · 像素对照台"),
+        ("multi", "首页走查", "首页走查 · 图片对比 · 像素对照台"),
+        ("gallery", "角色批次", "角色批次 · 批量图集 · 像素对照台"),
     ],
 )
-def test_card_brand_title_is_distinct_for_every_share_mode(
+def test_card_brand_moves_to_inline_title_for_every_share_mode(
     kind, title, expected_inline
 ):
     response = build_preview_response(
@@ -272,10 +271,7 @@ def test_card_brand_title_is_distinct_for_every_share_mode(
     )
 
     assert response["inline"]["title"] == expected_inline
-    assert response["card"]["data"]["header"]["title"] == {
-        "tag": "plain_text",
-        "content": "像素对照台",
-    }
+    assert "header" not in response["card"]["data"]
 
 
 def test_sdk_handler_schedules_missing_cover_without_blocking_response(app):
@@ -306,7 +302,7 @@ def test_sdk_handler_schedules_missing_cover_without_blocking_response(app):
 
     response = handler(P2URLPreviewGet({"event": {"context": {"url": raw_url}}}))
 
-    assert response.inline.title == "批次预览 · 批量图集"
+    assert response.inline.title == "批次预览 · 批量图集 · 像素对照台"
     assert response.card is None
     assert publisher.scheduled == 1
 
