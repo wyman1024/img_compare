@@ -9,7 +9,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$resolvedRoot = [System.IO.Path]::GetFullPath($ProjectRoot).TrimEnd("\")
+$cleanProjectRoot = $ProjectRoot.Trim().Trim('"').TrimEnd("\")
+$resolvedRoot = [System.IO.Path]::GetFullPath($cleanProjectRoot)
 $expectedPython = [System.IO.Path]::GetFullPath(
     (Join-Path $resolvedRoot ".venv\Scripts\python.exe")
 )

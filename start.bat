@@ -35,7 +35,7 @@ if not exist "feishu_preview_media.py" goto incomplete_files
 if not exist "stop_previous_server.ps1" goto incomplete_files
 if not defined PORT set "PORT=8000"
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0stop_previous_server.ps1" -Port "%PORT%" -ProjectRoot "%~dp0"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0stop_previous_server.ps1" -Port "%PORT%" -ProjectRoot "%CD%"
 if errorlevel 1 goto stop_previous_failed
 
 ".venv\Scripts\python.exe" server.py
