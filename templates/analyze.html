@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="多张图片的同步缩放、平移与滑杆对比页面。">
   <title>{{ project.title or '图片对比 ' ~ project.id[:8] }} · 像素对照台</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/pixel-compare-icon.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/analyze.css') }}">
   <script id="analysis-project-data" type="application/json">{{ project|tojson }}</script>

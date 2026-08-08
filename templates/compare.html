@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="两张图片的交互式滑动对比页面。">
   <title>图片对比 {{ comparison.id[:8] }} · 像素对照台</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/pixel-compare-icon.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
   <script src="{{ url_for('static', filename='js/compare.js') }}" defer></script>
 </head>

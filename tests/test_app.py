@@ -90,6 +90,30 @@ def test_home_exposes_unified_two_to_eight_image_creator(client):
     )
 
 
+def test_all_pages_use_the_pixel_compare_favicon(client):
+    icon_path = "/static/images/pixel-compare-icon.png"
+    icon = client.get(icon_path)
+
+    assert icon.status_code == 200
+    assert icon.mimetype == "image/png"
+    assert icon.data.startswith(b"\x89PNG\r\n\x1a\n")
+
+    template_dir = Path(__file__).resolve().parents[1] / "templates"
+    for template_name in (
+        "404.html",
+        "analyze.html",
+        "analyze_new.html",
+        "compare.html",
+        "gallery.html",
+        "gallery_new.html",
+    ):
+        template = (template_dir / template_name).read_text(encoding="utf-8")
+        assert "rel=\"icon\"" in template
+        assert "images/pixel-compare-icon.png" in template
+
+    assert f'href="{icon_path}"' in client.get("/").get_data(as_text=True)
+
+
 def test_creation_pages_offer_optional_per_image_title_fields(client):
     unified = client.get("/").get_data(as_text=True)
     gallery = client.get("/gallery/new").get_data(as_text=True)
