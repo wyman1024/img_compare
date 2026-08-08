@@ -1,8 +1,9 @@
 @echo off
 rem 复制本文件为 config.local.bat，填写真实值后双击 start.bat。
 rem config.local.bat 已被 Git 忽略，不要把 App Secret 提交到仓库。
+rem 图片卡片还要求同一飞书应用开启机器人能力和 im:resource 权限。
 
-set "SHARE_BASE_URL=http://jz-tools-server.corp.example.com:8000"
+set "SHARE_BASE_URL=http://img-compare.sg.cn:8000"
 set "FEISHU_APP_ID=cli_xxx"
 set "FEISHU_APP_SECRET=替换为真实_App_Secret"
 

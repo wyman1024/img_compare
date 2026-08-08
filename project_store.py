@@ -14,7 +14,7 @@ import warnings
 import weakref
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, Callable
 from urllib.parse import urlsplit
 
 from flask import Flask, abort, jsonify, redirect, render_template, request, send_file
@@ -929,7 +929,12 @@ def _share_url(app: Flask, relative_url: str) -> str:
     return share_url
 
 
-def register_project_routes(app: Flask, store: ProjectStore) -> None:
+def register_project_routes(
+    app: Flask,
+    store: ProjectStore,
+    *,
+    on_project_published: Callable[[dict[str, Any]], None] | None = None,
+) -> None:
     @app.get("/gallery/new")
     def gallery_new():
         return render_template(
@@ -1038,6 +1043,13 @@ def register_project_routes(app: Flask, store: ProjectStore) -> None:
             )
         except ProjectStoreError as error:
             return _api_error(error)
+        if created and on_project_published is not None:
+            try:
+                on_project_published(project)
+            except Exception:
+                app.logger.exception(
+                    "项目 %s 已发布，但飞书图片卡片预热失败。", draft_id
+                )
         public = store.public_project(project)
         return jsonify(
             {

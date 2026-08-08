@@ -20,7 +20,9 @@ KIND_LABELS = {
 }
 
 
-def _project_from_url(store: ProjectStore, raw_url: Any) -> dict[str, Any] | None:
+def resolve_preview_target(
+    store: ProjectStore, raw_url: Any
+) -> dict[str, Any] | None:
     if not isinstance(raw_url, str):
         return None
     try:
@@ -67,10 +69,65 @@ def resolve_preview_inline(
     *,
     image_key: str = "",
 ) -> dict[str, str] | None:
-    project = _project_from_url(store, raw_url)
+    project = resolve_preview_target(store, raw_url)
     if project is None:
         return None
     inline = {"title": _preview_title(project)}
     if image_key.strip():
         inline["image_key"] = image_key.strip()
     return inline
+
+
+def build_preview_response(
+    project: dict[str, Any],
+    raw_url: str,
+    *,
+    inline_image_key: str = "",
+    card_image_key: str = "",
+) -> dict[str, Any]:
+    title = _preview_title(project)
+    inline = {"title": title}
+    if inline_image_key.strip():
+        inline["image_key"] = inline_image_key.strip()
+
+    response: dict[str, Any] = {"inline": inline}
+    if not card_image_key.strip():
+        return response
+
+    response["card"] = {
+        "type": "raw",
+        "data": {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "template": "blue",
+                "title": {"tag": "plain_text", "content": title},
+            },
+            "elements": [
+                {
+                    "tag": "img",
+                    "img_key": card_image_key.strip(),
+                    "alt": {
+                        "tag": "plain_text",
+                        "content": f"{title}预览图",
+                    },
+                    "mode": "fit_horizontal",
+                    "preview": True,
+                },
+                {
+                    "tag": "action",
+                    "actions": [
+                        {
+                            "tag": "button",
+                            "type": "primary",
+                            "text": {
+                                "tag": "plain_text",
+                                "content": "打开完整对比",
+                            },
+                            "url": raw_url,
+                        }
+                    ],
+                },
+            ],
+        },
+    }
+    return response

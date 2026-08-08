@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 import threading
 
 import pytest
+from PIL import Image
 
 import feishu_long_connection
 from feishu_long_connection import (
@@ -13,6 +15,7 @@ from feishu_long_connection import (
     start_feishu_long_connection,
 )
 from feishu_preview import resolve_preview_inline
+from feishu_preview_media import FeishuPreviewPublisher
 
 
 PNG_1X1 = base64.b64decode(
@@ -177,9 +180,229 @@ def test_sdk_handler_returns_official_response_model(app):
     assert response.inline.image_key == "img_sdk_icon"
 
 
+@pytest.mark.parametrize("kind", ["multi", "gallery"])
+def test_publisher_builds_and_caches_project_cover_for_both_modes(app, kind):
+    published = _publish(app.test_client(), kind, title="封面测试")
+    store = app.extensions["project_store"]
+    project = store.load_project(published["id"])
+    uploaded_covers: list[bytes] = []
+
+    def upload_cover(cover: bytes) -> str:
+        uploaded_covers.append(cover)
+        with Image.open(io.BytesIO(cover)) as image:
+            assert image.format == "WEBP"
+            assert image.size == (1200, 630)
+        return "img_v3_test_project_cover"
+
+    publisher = FeishuPreviewPublisher(
+        store,
+        app_id="cli_cover_test",
+        app_secret="secret",
+        logger=app.logger,
+        upload_image=upload_cover,
+        publish_wait_seconds=1,
+    )
+
+    publisher.prepare_after_publish(project)
+    publisher.prepare_after_publish(project)
+
+    assert publisher.cached_image_key(project) == "img_v3_test_project_cover"
+    assert len(uploaded_covers) == 1
+    cache_path = store.projects_dir / published["id"] / "feishu-preview.json"
+    cache = json.loads(cache_path.read_text("utf-8"))
+    assert cache["app_id"] == "cli_cover_test"
+    assert cache["image_key"] == "img_v3_test_project_cover"
+    assert "secret" not in cache_path.read_text("utf-8")
+
+
+def test_sdk_handler_returns_raw_image_card_when_cover_is_cached(app):
+    from lark_oapi.event.callback.model.p2_url_preview_get import (
+        P2URLPreviewGet,
+        P2URLPreviewGetResponse,
+    )
+
+    published = _publish(app.test_client(), "multi", title="首页走查")
+    store = app.extensions["project_store"]
+    project = store.load_project(published["id"])
+    publisher = FeishuPreviewPublisher(
+        store,
+        app_id="cli_card_test",
+        app_secret="secret",
+        logger=app.logger,
+        upload_image=lambda _cover: "img_v3_card_cover",
+        publish_wait_seconds=1,
+    )
+    publisher.prepare_after_publish(project)
+    raw_url = f"http://img-compare.sg.cn:8000{published['url']}"
+    handler = build_url_preview_handler(
+        store,
+        image_key="img_inline_icon",
+        response_class=P2URLPreviewGetResponse,
+        publisher=publisher,
+    )
+    event = P2URLPreviewGet({"event": {"context": {"url": raw_url}}})
+
+    response = handler(event)
+
+    assert response.inline.title == "首页走查 · 图片对比"
+    assert response.inline.image_key == "img_inline_icon"
+    assert response.card.type == "raw"
+    assert response.card.data["elements"][0]["img_key"] == "img_v3_card_cover"
+    assert response.card.data["elements"][0]["mode"] == "fit_horizontal"
+    assert response.card.data["elements"][1]["actions"][0]["url"] == raw_url
+
+
+def test_sdk_handler_schedules_missing_cover_without_blocking_response(app):
+    from lark_oapi.event.callback.model.p2_url_preview_get import (
+        P2URLPreviewGet,
+        P2URLPreviewGetResponse,
+    )
+
+    class PendingPublisher:
+        def __init__(self):
+            self.scheduled = 0
+
+        def cached_image_key(self, _project):
+            return None
+
+        def ensure_async(self, _project):
+            self.scheduled += 1
+
+    published = _publish(app.test_client(), "gallery", title="批次预览")
+    raw_url = f"http://img-compare.sg.cn:8000{published['url']}"
+    publisher = PendingPublisher()
+    handler = build_url_preview_handler(
+        app.extensions["project_store"],
+        image_key="",
+        response_class=P2URLPreviewGetResponse,
+        publisher=publisher,
+    )
+
+    response = handler(P2URLPreviewGet({"event": {"context": {"url": raw_url}}}))
+
+    assert response.inline.title == "批次预览 · 批量图集"
+    assert response.card is None
+    assert publisher.scheduled == 1
+
+
+def test_concurrent_cover_requests_are_deduplicated(app):
+    published = _publish(app.test_client(), "multi")
+    store = app.extensions["project_store"]
+    project = store.load_project(published["id"])
+    upload_started = threading.Event()
+    release_upload = threading.Event()
+    upload_count = 0
+
+    def upload_cover(_cover: bytes) -> str:
+        nonlocal upload_count
+        upload_count += 1
+        upload_started.set()
+        assert release_upload.wait(2)
+        return "img_v3_deduplicated_cover"
+
+    publisher = FeishuPreviewPublisher(
+        store,
+        app_id="cli_deduplicate",
+        app_secret="secret",
+        logger=app.logger,
+        upload_image=upload_cover,
+    )
+
+    events = [publisher.ensure_async(project) for _ in range(5)]
+    assert upload_started.wait(2)
+    assert all(event is events[0] for event in events)
+    release_upload.set()
+    assert events[0].wait(2)
+    assert upload_count == 1
+
+
+def test_image_key_cache_is_scoped_to_feishu_app(app):
+    published = _publish(app.test_client(), "multi")
+    store = app.extensions["project_store"]
+    project = store.load_project(published["id"])
+    first = FeishuPreviewPublisher(
+        store,
+        app_id="cli_first",
+        app_secret="secret",
+        logger=app.logger,
+        upload_image=lambda _cover: "img_v3_first_app",
+        publish_wait_seconds=1,
+    )
+    second = FeishuPreviewPublisher(
+        store,
+        app_id="cli_second",
+        app_secret="secret",
+        logger=app.logger,
+        upload_image=lambda _cover: "img_v3_second_app",
+    )
+
+    first.prepare_after_publish(project)
+
+    assert first.cached_image_key(project) == "img_v3_first_app"
+    assert second.cached_image_key(project) is None
+
+
+def test_card_prewarm_failure_does_not_rollback_publication(
+    app_module, tmp_path, monkeypatch: pytest.MonkeyPatch
+):
+    class FailingPublisher:
+        calls = 0
+
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def prepare_after_publish(self, _project):
+            type(self).calls += 1
+            raise RuntimeError("simulated upload failure")
+
+    monkeypatch.setattr(app_module, "FeishuPreviewPublisher", FailingPublisher)
+    configured_app = app_module.create_app(
+        {
+            "TESTING": True,
+            "DATA_DIR": str(tmp_path / "prewarm-failure"),
+            "MIN_FREE_DISK_BYTES": 1,
+            "FEISHU_APP_ID": "cli_test",
+            "FEISHU_APP_SECRET": "secret",
+            "LAN_BASE_URL": "http://img-compare.sg.cn:8000",
+        }
+    )
+
+    client = configured_app.test_client()
+    published = _publish(client, "multi")
+    repeated = client.post(f"/api/drafts/{published['id']}/finalize")
+
+    assert repeated.status_code == 200
+    assert FailingPublisher.calls == 1
+    assert configured_app.extensions["project_store"].load_project(published["id"])
+
+
 def test_long_connection_is_disabled_without_credentials(app):
     assert start_feishu_long_connection(app) is None
     assert "feishu_preview_thread" not in app.extensions
+
+    status = app.test_client().get("/api/feishu/status")
+    assert status.status_code == 200
+    assert status.get_json() == {
+        "mode": "long_connection",
+        "configured": False,
+        "worker_running": False,
+        "client_initialized": False,
+        "worker_state": "disabled",
+        "last_error_type": None,
+        "last_callback_at": None,
+        "last_callback_result": None,
+        "last_callback_card_ready": None,
+        "share_base_url": None,
+        "card_preview": {
+            "configured": False,
+            "worker_running": False,
+            "queued": 0,
+            "last_uploaded_at": None,
+            "last_error_type": None,
+            "last_error_code": None,
+            "last_error_message": None,
+        },
+    }
 
 
 @pytest.mark.parametrize(

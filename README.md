@@ -53,7 +53,7 @@
 | `PREVIEW_QUALITY` | `82` | WebP 预览质量（1–100） |
 | `DATA_DIR` | 项目内的 `data` | 项目和草稿保存目录 |
 | `OPEN_BROWSER` | `1` | 设为 `0` 时启动后不自动打开浏览器 |
-| `SHARE_BASE_URL` | 自动识别 | 指定分享地址；飞书预览需使用公司内网 FQDN，如 `http://jz-tools-server.corp.example.com:8000` |
+| `SHARE_BASE_URL` | 自动识别 | 指定分享地址；飞书预览需使用公司内网 FQDN，如 `http://img-compare.sg.cn:8000` |
 | `FEISHU_APP_ID` | 空 | 企业自建应用的 App ID；与 App Secret 同时设置后启用飞书长连接预览 |
 | `FEISHU_APP_SECRET` | 空 | 企业自建应用的 App Secret；仅保存在服务机器的启动环境中 |
 | `FEISHU_PREVIEW_IMAGE_KEY` | 空 | 可选的飞书图片 key，用作链接标题前的统一小图标；不设置时只显示标题 |
@@ -62,43 +62,50 @@
 
 ## 飞书链接预览（内网长连接）
 
-服务通过飞书官方 SDK 主动建立 WebSocket 长连接。只要服务机器能够访问公网，就不需要公网 IP、域名、Webhook 请求地址或内网穿透，也不需要启用机器人能力。当前支持两类分享页面：
+服务通过飞书官方 SDK 主动建立 WebSocket 长连接。只要服务机器能够访问公网，就不需要公网 IP、Webhook 请求地址或内网穿透。当前支持两类分享页面：
 
 - 图片对比：`/analyze/<项目 ID>`
 - 批量图集：`/gallery/<项目 ID>`
 
-已有的 `/compare/<项目 ID>` 双图对比链接也可以生成预览。回调在内网进程中直接读取项目元数据，标题优先使用项目标题，并附加“图片对比”或“批量图集”；没有项目标题时使用模式名。`FEISHU_PREVIEW_IMAGE_KEY` 只用于统一前缀图标，不会把项目原图上传到飞书。
+已有的 `/compare/<项目 ID>` 双图对比链接也可以生成预览。发布项目时，服务会选取前几张图片合成为一张 1200×630 的静态拼图并上传到飞书，缓存返回的 `image_key`；回调只读缓存并返回标题与图片卡片，因此不会在 3 秒回调时限内临时上传。项目原图不会上传到飞书。`FEISHU_PREVIEW_IMAGE_KEY` 仍只用于标题前的统一小图标。
+
+纯标题预览不依赖机器人；图片卡片需要使用飞书“上传图片”接口，因此同一个自建应用必须开启 **机器人能力** 并申请 **获取与上传图片或文件资源（`im:resource`）** 权限。机器人只用于获得 `image_key`，不需要加入联系人会话或群聊。
 
 配置步骤：
 
-1. 为服务准备公司内网可解析的完整域名，例如 `jz-tools-server.corp.example.com`，并设置 `SHARE_BASE_URL=http://jz-tools-server.corp.example.com:8000`。飞书 URL 规则不接受 IP 或 `jz-tools-server` 这种单段主机名；端口 `8000` 可以保留。
+1. 为服务准备公司内网可解析的完整域名，例如 `img-compare.sg.cn`，并设置 `SHARE_BASE_URL=http://img-compare.sg.cn:8000`。飞书 URL 规则不接受 IP 或 `jz-tools-server` 这种单段主机名；端口 `8000` 可以保留。
 2. 创建 **企业自建应用**，在“应用能力”中添加“链接预览”。长连接暂不支持商店应用。
 3. 在链接预览能力中注册以下 URL 规则。配置时不要写 `http://` 或 `https://`；无通配符规则会自动匹配所有子路径。
 
    ```text
-   jz-tools-server.corp.example.com:8000/analyze
-   jz-tools-server.corp.example.com:8000/gallery
+   img-compare.sg.cn:8000/analyze
+   img-compare.sg.cn:8000/gallery
    ```
 
-   如仍在分享 `/compare/` 链接，再添加 `jz-tools-server.corp.example.com:8000/compare`。
-4. 从应用“凭证与基础信息”获取 App ID 和 App Secret。复制 `config.local.bat.example` 为 `config.local.bat`，填写 `SHARE_BASE_URL`、`FEISHU_APP_ID`、`FEISHU_APP_SECRET`。该本机配置文件已被 Git 忽略；两项凭证必须同时设置。
-5. 启动服务。窗口显示“飞书预览：长连接正在建立”，随后 SDK 日志出现 `connected to wss://...`，表示内网服务已连上飞书。
-6. 在飞书开发者后台进入“事件与回调 → 回调配置”，将订阅方式改为 **使用长连接接收回调**。保存时本服务必须正在运行并已连接。
-7. 添加“链接预览 → 拉取链接预览数据（`url.preview.get`）”回调，然后创建并发布正式应用版本。测试版本不支持链接预览，且预览只对应用可用范围内的用户生效。
-8. 在飞书中重新发送以 `http://` 或 `https://` 开头、使用上述完整内网域名的项目 URL。
+   如仍在分享 `/compare/` 链接，再添加 `img-compare.sg.cn:8000/compare`。
+4. 在“应用能力”中添加 **机器人**，并在“权限管理”中开通 **获取与上传图片或文件资源（`im:resource`）**。无需把机器人添加到任何会话。
+5. 从应用“凭证与基础信息”获取 App ID 和 App Secret。复制 `config.local.bat.example` 为 `config.local.bat`，填写 `SHARE_BASE_URL`、`FEISHU_APP_ID`、`FEISHU_APP_SECRET`。该本机配置文件已被 Git 忽略；两项凭证必须同时设置。
+6. 启动服务。窗口会显示“飞书预览：长连接正在建立”。SDK 日志默认不会打印包含临时连接凭据的完整 WebSocket URL。
+7. 在飞书开发者后台进入“事件与回调 → 回调配置”，将订阅方式改为 **使用长连接接收回调**。保存时本服务必须正在运行并已连接。
+8. 添加“链接预览 → 拉取链接预览数据（`url.preview.get`）”回调，然后创建并发布正式应用版本。机器人能力、权限和链接预览配置都必须包含在这个已发布版本中；测试版本不支持链接预览，且预览只对应用可用范围内的用户生效。
+9. 重启图片工具，在飞书中重新发送以 `http://` 或 `https://` 开头、使用上述完整内网域名的项目 URL。
+
+启动后可访问 `http://img-compare.sg.cn:8000/api/feishu/status` 查看诊断状态。`configured`、`worker_running`、`client_initialized` 应为 `true`；发送测试链接后，`last_callback_at` 应出现时间，`last_callback_result` 应为 `matched`，`last_callback_card_ready` 应为 `true`。`card_preview.last_error_code` 和 `card_preview.last_error_message` 可用于判断机器人能力或图片权限是否缺失。该接口不会返回 App ID 或 App Secret。
+
+新发布项目会在发布响应前做一次有界预热。为了避免把从未分享过的历史图片上传到飞书，旧项目只在链接实际触发预览时按需生成并上传；旧项目第一次可能仍只有标题，请等待 `card_preview.queued` 变为 `0` 后重新发送。飞书已经生成的旧消息不会自动改成新卡片；如果客户端仍复用旧预览，可在链接末尾临时加 `?preview=1` 触发一次新预览。
 
 也可以不创建配置文件，改为在命令提示符中临时配置并启动：
 
 ```bat
-set SHARE_BASE_URL=http://jz-tools-server.corp.example.com:8000
+set SHARE_BASE_URL=http://img-compare.sg.cn:8000
 set FEISHU_APP_ID=cli_xxx
 set FEISHU_APP_SECRET=你的_App_Secret
 start.bat
 ```
 
-如需前缀图标，可先通过飞书“上传图片”接口获得 `image_key`，再设置 `FEISHU_PREVIEW_IMAGE_KEY`。该项不影响链接预览的基本功能。
+如需前缀小图标，可另行设置 `FEISHU_PREVIEW_IMAGE_KEY`。项目内容图片由服务自动合成和上传，该配置不控制卡片封面。
 
-官方参考：[使用长连接接收回调](https://open.feishu.cn/document/event-subscription-guide/callback-subscription/step-1-choose-a-subscription-mode/configure-callback-request-address?lang=zh-CN)、[链接预览开发指南](https://open.feishu.cn/document/development-link-preview/link-preview-development-guide?lang=zh-CN)。
+官方参考：[使用长连接接收回调](https://open.feishu.cn/document/event-subscription-guide/callback-subscription/step-1-choose-a-subscription-mode/configure-callback-request-address?lang=zh-CN)、[链接预览开发指南](https://open.feishu.cn/document/development-link-preview/link-preview-development-guide?lang=zh-CN)、[上传图片 API](https://open.feishu.cn/document/server-docs/im-v1/image/create?lang=zh-CN)。
 
 ## 开发与测试
 
