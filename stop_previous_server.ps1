@@ -13,6 +13,7 @@ $resolvedRoot = [System.IO.Path]::GetFullPath($ProjectRoot).TrimEnd("\")
 $expectedPython = [System.IO.Path]::GetFullPath(
     (Join-Path $resolvedRoot ".venv\Scripts\python.exe")
 )
+$pythonPattern = '(?i)^\s*"?' + [regex]::Escape($expectedPython) + '"?(?:\s|$)'
 $serverPattern = '(?i)(^|[\s"\\])server\.py(?:[\s"]|$)'
 
 $listenerIds = @(
@@ -37,17 +38,7 @@ foreach ($ownerId in $listenerIds) {
         continue
     }
 
-    $samePython = $false
-    if (-not [string]::IsNullOrWhiteSpace($processInfo.ExecutablePath)) {
-        $actualExecutable = [System.IO.Path]::GetFullPath(
-            $processInfo.ExecutablePath
-        )
-        $samePython = [string]::Equals(
-            $actualExecutable,
-            $expectedPython,
-            [System.StringComparison]::OrdinalIgnoreCase
-        )
-    }
+    $samePython = $processInfo.CommandLine -match $pythonPattern
     $isProjectServer = $processInfo.CommandLine -match $serverPattern
     if (-not ($samePython -and $isProjectServer)) {
         $foreignProcesses += "PID $ownerId ($($processInfo.Name))"
