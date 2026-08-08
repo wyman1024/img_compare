@@ -30,6 +30,14 @@ echo [首次运行] 正在安装运行组件...
 if errorlevel 1 goto install_failed
 
 :run_server
+if not exist "server.py" goto incomplete_files
+if not exist "feishu_preview_media.py" goto incomplete_files
+if not exist "stop_previous_server.ps1" goto incomplete_files
+if not defined PORT set "PORT=8000"
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0stop_previous_server.ps1" -Port "%PORT%" -ProjectRoot "%~dp0"
+if errorlevel 1 goto stop_previous_failed
+
 ".venv\Scripts\python.exe" server.py
 if errorlevel 1 goto server_failed
 goto stopped
@@ -49,9 +57,20 @@ echo.
 echo 运行组件安装失败。首次启动需要能够访问 Python 软件源。
 goto failed
 
+:incomplete_files
+echo.
+echo 程序文件不完整，无法启动。
+echo 请确认 server.py、feishu_preview_media.py 和 stop_previous_server.ps1 已全部同步到当前目录。
+goto failed
+
+:stop_previous_failed
+echo.
+echo 无法安全停止旧服务。请根据上方提示处理占用端口的进程。
+goto failed
+
 :server_failed
 echo.
-echo 服务未能启动。常见原因是端口 8000 已被占用。
+echo 服务启动失败。请查看上方 Python 错误；旧进程已在启动前完成清理。
 goto failed
 
 :stopped
