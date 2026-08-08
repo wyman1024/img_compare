@@ -14,7 +14,7 @@ from feishu_long_connection import (
     build_url_preview_handler,
     start_feishu_long_connection,
 )
-from feishu_preview import resolve_preview_inline
+from feishu_preview import build_preview_response, resolve_preview_inline
 from feishu_preview_media import FeishuPreviewPublisher
 
 
@@ -247,9 +247,35 @@ def test_sdk_handler_returns_raw_image_card_when_cover_is_cached(app):
     assert response.inline.title == "首页走查 · 图片对比"
     assert response.inline.image_key == "img_inline_icon"
     assert response.card.type == "raw"
+    assert response.card.data["header"]["title"]["content"] == "像素对照台"
+    assert response.card.data["header"]["title"]["content"] != response.inline.title
     assert response.card.data["elements"][0]["img_key"] == "img_v3_card_cover"
     assert response.card.data["elements"][0]["mode"] == "fit_horizontal"
     assert response.card.data["elements"][1]["actions"][0]["url"] == raw_url
+
+
+@pytest.mark.parametrize(
+    ("kind", "title", "expected_inline"),
+    [
+        ("pair", "", "图片对比"),
+        ("multi", "首页走查", "首页走查 · 图片对比"),
+        ("gallery", "角色批次", "角色批次 · 批量图集"),
+    ],
+)
+def test_card_brand_title_is_distinct_for_every_share_mode(
+    kind, title, expected_inline
+):
+    response = build_preview_response(
+        {"kind": kind, "title": title},
+        "http://img-compare.sg.cn:8000/project/test",
+        card_image_key="img_v3_card_cover",
+    )
+
+    assert response["inline"]["title"] == expected_inline
+    assert response["card"]["data"]["header"]["title"] == {
+        "tag": "plain_text",
+        "content": "像素对照台",
+    }
 
 
 def test_sdk_handler_schedules_missing_cover_without_blocking_response(app):

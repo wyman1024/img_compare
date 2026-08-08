@@ -8,6 +8,7 @@ from project_store import ProjectStore
 
 
 PROJECT_ID_RE = re.compile(r"^[A-Za-z0-9_-]{20,64}$")
+TOOL_NAME = "像素对照台"
 ROUTE_KINDS = {
     "compare": "pair",
     "analyze": "multi",
@@ -100,7 +101,7 @@ def build_preview_response(
             "config": {"wide_screen_mode": True},
             "header": {
                 "template": "blue",
-                "title": {"tag": "plain_text", "content": title},
+                "title": {"tag": "plain_text", "content": TOOL_NAME},
             },
             "elements": [
                 {
