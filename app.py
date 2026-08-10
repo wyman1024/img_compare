@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import shutil
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -187,6 +188,32 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.get("/api/feishu/status")
     def feishu_status():
         return jsonify(feishu_status_snapshot(app))
+
+    @app.get("/api/health")
+    def health():
+        data_dir = Path(app.config["DATA_DIR"])
+        minimum_free_bytes = int(app.config["MIN_FREE_DISK_BYTES"])
+        try:
+            free_bytes = shutil.disk_usage(data_dir).free
+            storage_writable = os.access(data_dir, os.W_OK)
+        except OSError:
+            free_bytes = 0
+            storage_writable = False
+
+        healthy = storage_writable and free_bytes >= minimum_free_bytes
+        return (
+            jsonify(
+                {
+                    "status": "ok" if healthy else "degraded",
+                    "storage": {
+                        "writable": storage_writable,
+                        "free_bytes": free_bytes,
+                        "required_free_bytes": minimum_free_bytes,
+                    },
+                }
+            ),
+            200 if healthy else 503,
+        )
 
     @app.get("/compare/<comparison_id>")
     def compare(comparison_id: str):

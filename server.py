@@ -26,8 +26,8 @@ def _positive_port(raw_value: str) -> int:
 def _lan_addresses() -> list[str]:
     candidates: list[str] = []
 
-    # Ask Windows which interface owns the default route. UDP connect() only
-    # selects a route here; it does not send a packet.
+    # Ask the operating system which interface owns the default route. UDP
+    # connect() only selects a route here; it does not send a packet.
     probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         probe.connect(("192.0.2.1", 1))
@@ -84,7 +84,8 @@ def main() -> None:
             label = "局域网地址" if index == 0 else "备用地址  "
             print(f"  {label}： http://{address}:{port}")
     else:
-        print("  未自动找到局域网 IP；可用 ipconfig 查看本机 IPv4 地址。")
+        network_command = "ip address" if os.name == "posix" else "ipconfig"
+        print(f"  未自动找到局域网 IP；可用 {network_command} 查看本机 IPv4 地址。")
     if app.config.get("SHARE_BASE_URL_CONFIGURED"):
         print(f"  固定分享地址： {preferred_url}")
     if feishu_thread is None:

@@ -9,6 +9,8 @@
 
 ## 启动
 
+### Windows
+
 1. 在服务机器上安装 Python 3.10 或更高版本。
 2. 双击 `start.bat`。
 3. 首次运行会自动创建独立环境并安装依赖，随后浏览器会打开首页。
@@ -19,6 +21,34 @@
 每次运行 `start.bat` 前，脚本会检查目标端口。如果监听者是当前项目 `.venv` 启动的旧 `server.py`，会先强制结束旧进程再启动；如果端口属于其他程序，则会拒绝误杀并显示 PID。启动前也会检查飞书预览所需的新增源码文件是否已完整同步。
 
 > Windows 首次运行时可能弹出防火墙提示。请允许 Python 在“专用网络”中通信，否则其他局域网设备无法访问。
+
+### Debian / Linux
+
+不需要 root 权限，程序、虚拟环境、数据和日志都可以放在当前用户的主目录：
+
+```bash
+cd ~/img_compare_2
+cp config.env.example config.env
+# 修改 config.env，至少确认 PORT 和 SHARE_BASE_URL
+bash deploy/debian/install.sh
+```
+
+安装脚本会创建 `.venv`、安装运行依赖、启动后台服务，并在当前用户的 crontab 中配置开机启动和每分钟一次的进程守护。常用管理命令：
+
+```bash
+bash deploy/debian/manage.sh status
+bash deploy/debian/manage.sh restart
+bash deploy/debian/manage.sh stop
+tail -f logs/server.log
+```
+
+服务健康检查地址为 `http://127.0.0.1:8000/api/health`。如机器允许使用 systemd，生产环境也可以让管理员将 `bash start.sh` 配置为受监管的服务；无管理员权限时，仓库提供的后台管理脚本和 `@reboot` 任务可以完成用户级部署。
+
+如果本机健康检查正常、其他电脑仍无法连接，请让管理员在防火墙中仅向可信局域网放行服务端口。例如使用 UFW 且客户端位于 `192.168.50.0/24` 时：
+
+```bash
+sudo ufw allow from 192.168.50.0/24 to any port 8000 proto tcp
+```
 
 ## 使用
 

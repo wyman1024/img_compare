@@ -677,6 +677,41 @@ def test_insufficient_disk_returns_507(app, monkeypatch):
     assert_error(response, 507, "insufficient_storage")
 
 
+def test_health_reports_storage_readiness(app, app_module, monkeypatch):
+    healthy_usage = type(
+        "Usage",
+        (),
+        {
+            "total": app.config["MIN_FREE_DISK_BYTES"] + 100,
+            "used": 100,
+            "free": app.config["MIN_FREE_DISK_BYTES"],
+        },
+    )()
+    monkeypatch.setattr(app_module.shutil, "disk_usage", lambda _path: healthy_usage)
+
+    response = app.test_client().get("/api/health")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "status": "ok",
+        "storage": {
+            "writable": True,
+            "free_bytes": app.config["MIN_FREE_DISK_BYTES"],
+            "required_free_bytes": app.config["MIN_FREE_DISK_BYTES"],
+        },
+    }
+
+
+def test_health_returns_503_when_storage_is_not_ready(app, app_module, monkeypatch):
+    low_usage = type("Usage", (), {"total": 100, "used": 99, "free": 1})()
+    monkeypatch.setattr(app_module.shutil, "disk_usage", lambda _path: low_usage)
+
+    response = app.test_client().get("/api/health")
+
+    assert response.status_code == 503
+    assert response.get_json()["status"] == "degraded"
+
+
 def test_upload_reserves_configured_free_space_after_worst_case_write(
     app, monkeypatch
 ):
