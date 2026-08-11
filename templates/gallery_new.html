@@ -51,7 +51,7 @@
           <p class="section-kicker">02 · 逐组添加</p>
           <h2 id="add-title">放入这一组图片</h2>
         </div>
-        <p>拖入一个文件会放到当前槽位；一次拖入两个文件会自动填满 A / B。</p>
+        <p>拖入一个文件会放到当前槽位；文件名会自动作为图片标题，每组都可单独清除。支持 PNG、JPG/JPEG、WebP、GIF、BMP 格式。</p>
       </div>
 
       <div class="gallery-pair-editor" id="pair-editor">
@@ -82,7 +82,7 @@
             </article>
             <label class="gallery-field gallery-image-title-field" for="pending-a-image-title">
               <span>A 图片标题 <small>可选</small></span>
-              <input class="gallery-pending-image-title" id="pending-a-image-title" data-slot="A" type="text" maxlength="80" placeholder="默认不显示标题" autocomplete="off" disabled>
+              <input class="gallery-pending-image-title" id="pending-a-image-title" data-slot="A" type="text" maxlength="80" placeholder="默认使用文件名，可修改" autocomplete="off" disabled>
             </label>
           </div>
 
@@ -109,7 +109,7 @@
             </article>
             <label class="gallery-field gallery-image-title-field" for="pending-b-image-title">
               <span>B 图片标题 <small>可选</small></span>
-              <input class="gallery-pending-image-title" id="pending-b-image-title" data-slot="B" type="text" maxlength="80" placeholder="默认不显示标题" autocomplete="off" disabled>
+              <input class="gallery-pending-image-title" id="pending-b-image-title" data-slot="B" type="text" maxlength="80" placeholder="默认使用文件名，可修改" autocomplete="off" disabled>
             </label>
           </div>
         </div>
@@ -186,8 +186,8 @@
       <div class="gallery-review-copy">
         <label class="gallery-review-group-title"><span>组名</span><input class="gallery-review-title" type="text" maxlength="80" autocomplete="off"></label>
         <div class="gallery-review-image-titles">
-          <label><span>A 图片标题 <small>可选</small></span><input class="gallery-review-image-title" data-slot="A" type="text" maxlength="80" placeholder="默认不显示" autocomplete="off"></label>
-          <label><span>B 图片标题 <small>可选</small></span><input class="gallery-review-image-title" data-slot="B" type="text" maxlength="80" placeholder="默认不显示" autocomplete="off"></label>
+          <label><span>A 图片标题 <small>可选</small></span><input class="gallery-review-image-title" data-slot="A" type="text" maxlength="80" placeholder="默认使用文件名，可修改" autocomplete="off"></label>
+          <label><span>B 图片标题 <small>可选</small></span><input class="gallery-review-image-title" data-slot="B" type="text" maxlength="80" placeholder="默认使用文件名，可修改" autocomplete="off"></label>
         </div>
         <p class="gallery-review-files"></p>
       </div>
@@ -195,6 +195,7 @@
         <button type="button" data-action="replace-a">替换 A</button>
         <button type="button" data-action="replace-b">替换 B</button>
         <button type="button" data-action="swap">交换</button>
+        <button type="button" data-action="clear-default-titles" title="清除本组由文件名自动生成的图片标题">清除默认标题</button>
         <button type="button" data-action="up" aria-label="上移这一组">↑</button>
         <button type="button" data-action="down" aria-label="下移这一组">↓</button>
         <button class="is-danger" type="button" data-action="delete">删除</button>

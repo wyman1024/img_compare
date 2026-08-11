@@ -58,12 +58,32 @@
     return { targets, slotCount: occupied.length, remaining };
   };
 
+  const defaultImageTitle = (fileName) => String(fileName || '').trim().slice(0, 80);
+
+  const hasDefaultImageTitles = (images) => images.some(
+    (image) => image?.titleSource === 'filename' && Boolean(image.title),
+  );
+
+  const clearDefaultImageTitles = (images) => {
+    let cleared = 0;
+    images.forEach((image) => {
+      if (!image || image.titleSource !== 'filename') return;
+      image.title = '';
+      image.titleSource = 'cleared';
+      cleared += 1;
+    });
+    return cleared;
+  };
+
   const testHooks = {
     minImages: MIN_IMAGES,
     hardMaxImages: HARD_MAX_IMAGES,
     clampImageLimit,
     normalizeSlotCount,
     planSlotAssignments,
+    defaultImageTitle,
+    hasDefaultImageTitles,
+    clearDefaultImageTitles,
   };
   globalThis.AnalyzeCreateUtils = testHooks;
   globalThis.__analyzeCreateTestHooks = Object.assign(
@@ -91,6 +111,7 @@
   const cancelButton = document.querySelector('#cancel-upload');
   const addSlotButton = document.querySelector('#add-slot');
   const removeSlotButton = document.querySelector('#remove-slot');
+  const clearDefaultTitlesButton = document.querySelector('#clear-default-titles');
 
   if (!form || !grid || !template) return;
 
@@ -132,11 +153,15 @@
     return '';
   };
 
-  const makeRecord = (file) => ({
-    file,
-    title: '',
-    previewUrl: URL.createObjectURL(file),
-  });
+  const makeRecord = (file) => {
+    const title = defaultImageTitle(file.name);
+    return {
+      file,
+      title,
+      titleSource: title ? 'filename' : 'cleared',
+      previewUrl: URL.createObjectURL(file),
+    };
+  };
 
   const revokeRecord = (record) => {
     if (record?.previewUrl) URL.revokeObjectURL(record.previewUrl);
@@ -150,7 +175,7 @@
     countNode.textContent = `${selected.length} 张已选 · ${slotCount} 个槽位`;
     sizeNode.textContent = selected.length
       ? `合计 ${formatBytes(total)} · 单图上限 ${formatBytes(maxImageBytes)}`
-      : '支持 PNG、JPG、WebP、GIF、BMP';
+      : '支持 PNG、JPG/JPEG、WebP、GIF、BMP';
     const missing = slotCount - selected.length;
     if (selected.length < MIN_IMAGES) summaryNode.textContent = `还需要 ${MIN_IMAGES - selected.length} 张图片`;
     else if (missing) summaryNode.textContent = `还需要填入 ${missing} 个槽位`;
@@ -162,6 +187,7 @@
     createButton.disabled = busy || !valid;
     addSlotButton.disabled = busy || slotCount >= maxImages;
     removeSlotButton.disabled = busy || slotCount <= MIN_IMAGES || Boolean(records[slotCount - 1]);
+    clearDefaultTitlesButton.disabled = busy || !hasDefaultImageTitles(records);
     if (total > maxProjectBytes) showError(`全部图片合计不能超过 ${formatBytes(maxProjectBytes)}。`);
   };
 
@@ -266,6 +292,8 @@
         return;
       }
       record.title = event.target.value;
+      record.titleSource = 'custom';
+      updateSummary();
     });
     slot.querySelector('.move-left').addEventListener('click', () => moveRecord(index, index - 1));
     slot.querySelector('.move-right').addEventListener('click', () => moveRecord(index, index + 1));
@@ -345,6 +373,11 @@
       images,
     };
   };
+
+  clearDefaultTitlesButton.addEventListener('click', () => {
+    if (busy || !clearDefaultImageTitles(records)) return;
+    renderSlots();
+  });
 
   const setBusy = (value) => {
     busy = value;

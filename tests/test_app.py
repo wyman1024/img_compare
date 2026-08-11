@@ -118,13 +118,21 @@ def test_creation_pages_offer_optional_per_image_title_fields(client):
     unified = client.get("/").get_data(as_text=True)
     gallery = client.get("/gallery/new").get_data(as_text=True)
 
+    supported_format_tip = "支持 PNG、JPG/JPEG、WebP、GIF、BMP 格式。"
+    assert supported_format_tip in unified
+    assert supported_format_tip in gallery
+    assert 'id="clear-default-titles"' in unified
+    assert 'data-action="clear-default-titles"' in gallery
+    assert "文件名会自动作为图片标题" in unified
+    assert "文件名会自动作为图片标题" in gallery
     assert 'class="analyze-image-title-input"' in unified
-    assert 'placeholder="图片标题（可选）"' in unified
+    assert 'placeholder="默认使用文件名，可修改"' in unified
     assert "analyze-label-input" not in unified
     assert "自定义版本标签" not in unified
     assert unified.count('maxlength="80"') >= 2
     assert gallery.count("gallery-pending-image-title") >= 2
     assert "gallery-review-image-title" in gallery
+    assert gallery.count('placeholder="默认使用文件名，可修改"') >= 4
     assert "variant-a-label" not in gallery
     assert "variant-b-label" not in gallery
     assert "A 标签" not in gallery

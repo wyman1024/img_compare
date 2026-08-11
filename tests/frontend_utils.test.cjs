@@ -33,6 +33,18 @@ async function testGalleryUtilities() {
   assert.equal(create.uploadConcurrency, 3);
   assert.deepEqual(Array.from(create.moveItem(['a', 'b', 'c'], 0, 2)), ['b', 'c', 'a']);
   assert.deepEqual(Array.from(create.moveItem(['a', 'b', 'c'], 2, -5)), ['c', 'a', 'b']);
+  assert.equal(create.defaultImageTitle('render-final.webp'), 'render-final.webp');
+  assert.equal(create.defaultImageTitle(`a${'b'.repeat(100)}.png`).length, 80);
+  const galleryImages = [
+    { title: 'left.png', titleSource: 'filename' },
+    { title: '人工标题', titleSource: 'custom' },
+  ];
+  assert.equal(create.hasDefaultImageTitles(galleryImages), true);
+  assert.equal(create.clearDefaultImageTitles(galleryImages), 1);
+  assert.equal(galleryImages[0].title, '');
+  assert.equal(galleryImages[0].titleSource, 'cleared');
+  assert.equal(galleryImages[1].title, '人工标题');
+  assert.equal(create.hasDefaultImageTitles(galleryImages), false);
 
   let active = 0;
   let peak = 0;
@@ -147,6 +159,15 @@ function testAnalyzeCreatorSlots() {
   assert.equal(utils.clampImageLimit(1), 2);
   assert.equal(utils.normalizeSlotCount(2, 5, 8), 5);
   assert.equal(utils.normalizeSlotCount(8, 2, 8), 8);
+  assert.equal(utils.defaultImageTitle('variant-a.jpg'), 'variant-a.jpg');
+  const analyzeImages = [
+    { title: 'variant-a.jpg', titleSource: 'filename' },
+    { title: '保留标题', titleSource: 'custom' },
+  ];
+  assert.equal(utils.hasDefaultImageTitles(analyzeImages), true);
+  assert.equal(utils.clearDefaultImageTitles(analyzeImages), 1);
+  assert.equal(analyzeImages[0].title, '');
+  assert.equal(analyzeImages[1].title, '保留标题');
   const targetB = utils.planSlotAssignments([false, false], 1, 1, 8);
   assert.deepEqual(Array.from(targetB.targets), [1]);
   assert.equal(targetB.slotCount, 2);

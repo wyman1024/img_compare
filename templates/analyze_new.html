@@ -46,11 +46,12 @@
       <div class="analyze-slot-heading">
         <div>
           <h2>选择图片</h2>
-          <p>可一次拖入多张并自动增加槽位；图片标题、顺序稍后都能调整。</p>
+          <p>可一次拖入多张并自动增加槽位；文件名会自动作为图片标题，可一键清除。支持 PNG、JPG/JPEG、WebP、GIF、BMP 格式。</p>
         </div>
         <div class="analyze-slot-heading-actions">
           <span id="slot-count" aria-live="polite">0 张已选 · 2 个槽位</span>
           <div class="analyze-slot-count-actions" aria-label="调整图片槽位数量">
+            <button class="analyze-secondary-button analyze-clear-default-titles" id="clear-default-titles" type="button" title="清除由文件名自动生成的图片标题" disabled>清除默认标题</button>
             <button class="analyze-secondary-button analyze-remove-slot" id="remove-slot" type="button">－ 减少槽位</button>
             <button class="analyze-secondary-button analyze-add-slot" id="add-slot" type="button">＋ 添加槽位</button>
           </div>
@@ -85,7 +86,7 @@
             <div class="analyze-slot-fields">
               <label>
                 <span class="sr-only">图片标题（可选）</span>
-                <input class="analyze-image-title-input" type="text" maxlength="80" placeholder="图片标题（可选）" autocomplete="off">
+                <input class="analyze-image-title-input" type="text" maxlength="80" placeholder="默认使用文件名，可修改" autocomplete="off">
               </label>
             </div>
             <div class="analyze-order-actions">
@@ -118,7 +119,7 @@
       <div class="analyze-submit-bar">
         <div class="analyze-submit-copy">
           <strong id="selection-summary">还需要至少 2 张图片</strong>
-          <span id="selection-size">支持 PNG、JPG、WebP、GIF、BMP</span>
+          <span id="selection-size">支持 PNG、JPG/JPEG、WebP、GIF、BMP</span>
         </div>
         <button class="primary-button analyze-create-button" id="create-analysis" type="submit" disabled>
           <span class="button-label">生成图片对比</span>

@@ -136,7 +136,9 @@
 
 .analyze-slot-count-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
+  justify-content: flex-end;
 }
 
 .analyze-slot-count-actions .analyze-secondary-button {

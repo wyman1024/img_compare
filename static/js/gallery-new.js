@@ -30,7 +30,32 @@
     await Promise.all(runners);
   };
 
-  const testHooks = { formatBytes, moveItem, runConcurrent, uploadConcurrency: 3 };
+  const defaultImageTitle = (fileName) => String(fileName || '').trim().slice(0, 80);
+
+  const hasDefaultImageTitles = (images) => images.some(
+    (image) => image?.titleSource === 'filename' && Boolean(image.title),
+  );
+
+  const clearDefaultImageTitles = (images) => {
+    let cleared = 0;
+    images.forEach((image) => {
+      if (!image || image.titleSource !== 'filename') return;
+      image.title = '';
+      image.titleSource = 'cleared';
+      cleared += 1;
+    });
+    return cleared;
+  };
+
+  const testHooks = {
+    formatBytes,
+    moveItem,
+    runConcurrent,
+    defaultImageTitle,
+    hasDefaultImageTitles,
+    clearDefaultImageTitles,
+    uploadConcurrency: 3,
+  };
   globalThis.GalleryCreateUtils = testHooks;
   globalThis.__galleryTestHooks = Object.assign(globalThis.__galleryTestHooks || {}, testHooks);
 
@@ -126,14 +151,18 @@
 
     const objectUrl = URL.createObjectURL(file);
     const probe = new Image();
-    probe.onload = () => resolve({
-      id: makeId('img'),
-      file,
-      objectUrl,
-      width: probe.naturalWidth,
-      height: probe.naturalHeight,
-      title: '',
-    });
+    probe.onload = () => {
+      const title = defaultImageTitle(file.name);
+      resolve({
+        id: makeId('img'),
+        file,
+        objectUrl,
+        width: probe.naturalWidth,
+        height: probe.naturalHeight,
+        title,
+        titleSource: title ? 'filename' : 'cleared',
+      });
+    };
     probe.onerror = () => {
       URL.revokeObjectURL(objectUrl);
       reject(new Error(`“${file.name}”已损坏或无法读取，请换一张图片。`));
@@ -325,7 +354,10 @@
     input.addEventListener('input', () => {
       if (state.locked) return;
       const entry = state.pending[input.dataset.slot];
-      if (entry) entry.title = input.value;
+      if (entry) {
+        entry.title = input.value;
+        entry.titleSource = 'custom';
+      }
     });
   });
 
@@ -396,6 +428,8 @@
       item.querySelectorAll('button').forEach((button) => {
         if (!['up', 'down'].includes(button.dataset.action)) button.disabled = state.locked;
       });
+      item.querySelector('[data-action="clear-default-titles"]').disabled = state.locked
+        || !hasDefaultImageTitles([group.images.A, group.images.B]);
       reviewList.append(item);
     });
   }
@@ -437,8 +471,15 @@
     if (!input || state.locked) return;
     const group = state.groups.find((candidate) => candidate.id === input.closest('li').dataset.groupId);
     if (!group) return;
-    if (input.classList.contains('gallery-review-title')) group.title = input.value;
-    else group.images[input.dataset.slot].title = input.value;
+    if (input.classList.contains('gallery-review-title')) {
+      group.title = input.value;
+    } else {
+      const image = group.images[input.dataset.slot];
+      image.title = input.value;
+      image.titleSource = 'custom';
+      input.closest('li').querySelector('[data-action="clear-default-titles"]').disabled = state.locked
+        || !hasDefaultImageTitles([group.images.A, group.images.B]);
+    }
   });
 
   reviewList.addEventListener('click', (event) => {
@@ -454,7 +495,9 @@
       item.querySelector(`.gallery-replace-input[data-slot="${action.endsWith('a') ? 'A' : 'B'}"]`).click();
       return;
     }
-    if (action === 'swap') {
+    if (action === 'clear-default-titles') {
+      clearDefaultImageTitles([group.images.A, group.images.B]);
+    } else if (action === 'swap') {
       [group.images.A, group.images.B] = [group.images.B, group.images.A];
     } else if (action === 'delete') {
       releaseImage(group.images.A);

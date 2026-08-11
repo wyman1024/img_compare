@@ -50,6 +50,18 @@ tail -f logs/server.log
 sudo ufw allow from 192.168.50.0/24 to any port 8000 proto tcp
 ```
 
+### Windows 一键部署到 Debian
+
+在开发机上双击项目根目录的 `deploy.bat`。脚本会自动：
+
+1. 准备本地测试和部署依赖；
+2. 运行完整测试，测试失败时不会修改服务器；
+3. 安全提示输入一次 SSH 密码，校验服务器主机密钥；
+4. 备份远端旧代码并原子上传当前 Git 工作区文件；
+5. 重启服务并检查首页、图集、健康状态和飞书状态接口。
+
+服务器上的 `config.env`、`config.local.bat`、`.venv`、`data`、`logs` 和 `.run` 不会被覆盖。每次部署的旧代码保存在服务器项目目录下的 `.deploy-backups/<时间戳>` 中。默认目标为 `qiujiawei@192.168.100.71:32200`，部署目录为 `/home/qiujiawei/img_compare_2`。
+
 ## 使用
 
 首页提供统一的图片对比入口：
