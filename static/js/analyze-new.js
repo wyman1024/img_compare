@@ -133,6 +133,7 @@
   let finalizing = false;
   let allowNavigation = false;
   let dragDepth = 0;
+  let draggedIndex = null;
 
   const formatBytes = (bytes) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -271,12 +272,41 @@
       if (input.files.length) addFiles([input.files[0]], index);
       input.value = '';
     });
-    drop.addEventListener('dragover', (event) => {
-      event.preventDefault();
-      if (!busy) drop.classList.add('is-dragging');
+    drop.addEventListener('dragstart', (event) => {
+      if (busy || !record) {
+        event.preventDefault();
+        return;
+      }
+      draggedIndex = index;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('application/x-image-compare-slot', String(index));
     });
-    drop.addEventListener('dragleave', () => drop.classList.remove('is-dragging'));
-    drop.addEventListener('drop', (event) => {
+    drop.addEventListener('dragend', () => {
+      draggedIndex = null;
+      grid.querySelectorAll('.is-dragging').forEach((target) => target.classList.remove('is-dragging'));
+    });
+    slot.addEventListener('dragover', (event) => {
+      if (busy || draggedIndex === index) return;
+      const movingImage = draggedIndex !== null;
+      if (!movingImage && (!drop.contains(event.target) || !event.dataTransfer.types.includes('Files'))) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = movingImage ? 'move' : 'copy';
+      drop.classList.add('is-dragging');
+    });
+    slot.addEventListener('dragleave', (event) => {
+      const target = draggedIndex === null ? drop : slot;
+      if (!target.contains(event.relatedTarget)) drop.classList.remove('is-dragging');
+    });
+    slot.addEventListener('drop', (event) => {
+      if (draggedIndex !== null) {
+        event.preventDefault();
+        event.stopPropagation();
+        const from = draggedIndex;
+        draggedIndex = null;
+        moveRecord(from, index);
+        return;
+      }
+      if (!drop.contains(event.target)) return;
       event.preventDefault();
       event.stopPropagation();
       dragDepth = 0;
@@ -302,6 +332,7 @@
   };
 
   function renderSlots() {
+    draggedIndex = null;
     grid.replaceChildren();
     slotCount = normalizeSlotCount(slotCount, records.length, maxImages);
     grid.style.setProperty('--slot-columns', String(Math.min(slotCount, 4)));
@@ -317,6 +348,7 @@
       const preview = slot.querySelector('.analyze-slot-preview');
       const edit = slot.querySelector('.analyze-slot-edit');
       fileInput.disabled = busy;
+      drop.draggable = Boolean(record) && !busy;
       drop.tabIndex = busy ? -1 : 0;
       drop.setAttribute('aria-disabled', String(busy));
 
